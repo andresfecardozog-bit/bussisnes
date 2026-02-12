@@ -1,0 +1,61 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual envs ---
+venv/
+env/
+.venv/
+
+# --- Testing / linting ---
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Data local (NO commitear; Railway usa volumen persistente) ---
+data/historico.sqlite
+data/historico.sqlite-journal
+data/historico.sqlite-wal
+data/historico.sqlite-shm
+data/uploads/
+data/runs/
+data/onedrive_export/
+data/logs/
+
+# --- Logs ---
+logs/
+
+# --- Secretos (Fase 7B/7E) ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+!requirements.txt
+
+# --- Notebooks intermedios ---
+.ipynb_checkpoints/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Cursor / metadata local ---
+.cursor/
+agent-transcripts/
+
+# --- Artefactos temporales del proyecto ---
+_smoke_*.py
+_scratch_*.py
