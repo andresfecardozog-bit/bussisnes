@@ -1,0 +1,18 @@
+# Aseguramos LF en scripts shell y Dockerfile (Windows tiende a CRLF).
+# Sin esto, `docker-entrypoint.sh` da "exec: bad interpreter" en Linux.
+
+*.sh              text eol=lf
+Dockerfile        text eol=lf
+docker-entrypoint.sh text eol=lf
+
+# Binarios (nunca convertir)
+*.xlsx  binary
+*.xlsm  binary
+*.zip   binary
+*.jpg   binary
+*.jpeg  binary
+*.png   binary
+*.gif   binary
+*.ico   binary
+*.pkl   binary
+*.sqlite binary
