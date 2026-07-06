@@ -127,10 +127,29 @@ Compromisos no negociables:
   + docs de deploy en Railway. Backend expone todo lo necesario; n8n solo
   llama endpoints en secuencia y notifica (2026-07-06).
 - [x] **Fase 7E** - StorageAdapter cableado en `generate_batch`: mirror
-  automatico de outputs al bucket Supabase cuando `SUPABASE_URL +
-  SUPABASE_SERVICE_KEY` estan definidas. `download_file` retorna 307
-  Redirect a signed URL. Fallback silencioso a disco local si Supabase
-  falla. 2 tests con fake storage (2026-07-06).
+ automatico de outputs al bucket Supabase cuando `SUPABASE_URL +
+ SUPABASE_SERVICE_KEY` estan definidas. `download_file` retorna 307
+ Redirect a signed URL. Fallback silencioso a disco local si Supabase
+ falla. 2 tests con fake storage (2026-07-06).
+- [x] **Fase 7C.1** - Fix pagina en blanco Vercel + local (2026-07-06):
+ (a) `environment.prod.ts` faltaba el esquema `https://` en `apiBaseUrl`,
+ lo que provocaba que HttpClient tratara la URL como path relativo y
+ pegara al propio Vercel devolviendo `index.html` en vez de JSON;
+ (b) `vercel.json` con `rewrites: [{ source: "/(.*)", ... }]` capturaba
+ tambien los bundles `main-*.js` y `styles-*.css` cuando el navegador
+ pedia un hash viejo (post-redeploy), rompiendo la app con
+ `SyntaxError: Unexpected token '<'`. Nueva regex excluye `assets/` y
+ cualquier ruta con extension. Agregamos `Cache-Control: no-cache` sobre
+ `index.html` para evitar el cache de hashes zombies; y
+ `max-age=31536000, immutable` sobre los hashed assets; (c) `app.html`
+ usaba `src="assets/logo.jpg"` (relativo), que se rompia en rutas
+ anidadas tipo `/batches/nuevo/assets/logo.jpg`; ahora usa
+ `/assets/logo.jpg` (absoluto); (d) el preview URL
+ `cumplimientoplataforma-<hash>-byzocars-projects.vercel.app` sirve la
+ pagina de login de Vercel (Deployment Protection activa por default),
+ no la SPA. Usar el dominio de produccion o desactivar la proteccion en
+ Vercel dashboard. Troubleshooting completo en
+ [docs/deploy_vercel.md](docs/deploy_vercel.md#troubleshooting-pagina-en-blanco).
 ---
 
 ## Fase 4 - resumen de lo entregado (2026-07-02)

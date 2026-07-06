@@ -1,9 +1,13 @@
-// Reemplazado en build de produccion. En Vercel, definir estas variables
-// como `NG_APP_API_BASE_URL` y hacer que Angular las inyecte via build args.
-// Alternativa runtime: window.__ENV__.
-
+// Config runtime en produccion (build de Vercel).
+// El archivo `environment.ts` (dev) se reemplaza por este en el build
+// via `angular.json > fileReplacements`.
+//
+// IMPORTANTE: `apiBaseUrl` DEBE incluir el esquema `https://`. Sin el,
+// Angular HttpClient trata la URL como path relativo y todas las llamadas
+// terminan resolviendose contra el propio dominio Vercel, con lo que
+// devuelven el index.html en vez de JSON y el frontend explota en runtime.
 export const environment = {
   production: true,
-  apiBaseUrl: 'bussisnes-intelligen-t-production.up.railway.app',
+  apiBaseUrl: 'https://bussisnes-intelligen-t-production.up.railway.app',
   n8nWebhookMatch: '',
 };
