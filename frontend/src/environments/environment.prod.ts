@@ -4,6 +4,6 @@
 
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://REPLACE-WITH-RAILWAY-URL.up.railway.app',
+  apiBaseUrl: 'bussisnes-intelligen-t-production.up.railway.app',
   n8nWebhookMatch: '',
 };
