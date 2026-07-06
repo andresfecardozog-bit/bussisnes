@@ -1,0 +1,11 @@
+# Dependencias solo para desarrollo, generacion de recursos y CI.
+# El runtime en Railway usa unicamente requirements.txt.
+
+-r requirements.txt
+
+# Testing
+pytest>=7.4
+
+# Generacion offline del calendario laboral colombiano.
+# NO se importa en runtime: el CSV resultante se commitea a resources/.
+holidays>=0.50

@@ -1,0 +1,487 @@
+fecha,es_domingo,es_festivo,motivo
+2024-01-01,0,1,Año Nuevo
+2024-01-07,1,0,Domingo
+2024-01-08,0,1,Día de los Reyes Magos (observado)
+2024-01-14,1,0,Domingo
+2024-01-21,1,0,Domingo
+2024-01-28,1,0,Domingo
+2024-02-04,1,0,Domingo
+2024-02-11,1,0,Domingo
+2024-02-18,1,0,Domingo
+2024-02-25,1,0,Domingo
+2024-03-03,1,0,Domingo
+2024-03-10,1,0,Domingo
+2024-03-17,1,0,Domingo
+2024-03-24,1,0,Domingo
+2024-03-25,0,1,Día de San José (observado)
+2024-03-28,0,1,Jueves Santo
+2024-03-29,0,1,Viernes Santo
+2024-03-31,1,0,Domingo
+2024-04-07,1,0,Domingo
+2024-04-14,1,0,Domingo
+2024-04-21,1,0,Domingo
+2024-04-28,1,0,Domingo
+2024-05-01,0,1,Día del Trabajo
+2024-05-05,1,0,Domingo
+2024-05-12,1,0,Domingo
+2024-05-13,0,1,Ascensión del señor (observado)
+2024-05-19,1,0,Domingo
+2024-05-26,1,0,Domingo
+2024-06-02,1,0,Domingo
+2024-06-03,0,1,Corpus Christi (observado)
+2024-06-09,1,0,Domingo
+2024-06-10,0,1,Sagrado Corazón (observado)
+2024-06-16,1,0,Domingo
+2024-06-23,1,0,Domingo
+2024-06-30,1,0,Domingo
+2024-07-01,0,1,San Pedro y San Pablo (observado)
+2024-07-07,1,0,Domingo
+2024-07-14,1,0,Domingo
+2024-07-20,0,1,Día de la Independencia
+2024-07-21,1,0,Domingo
+2024-07-28,1,0,Domingo
+2024-08-04,1,0,Domingo
+2024-08-07,0,1,Batalla de Boyacá
+2024-08-11,1,0,Domingo
+2024-08-18,1,0,Domingo
+2024-08-19,0,1,La Asunción (observado)
+2024-08-25,1,0,Domingo
+2024-09-01,1,0,Domingo
+2024-09-08,1,0,Domingo
+2024-09-15,1,0,Domingo
+2024-09-22,1,0,Domingo
+2024-09-29,1,0,Domingo
+2024-10-06,1,0,Domingo
+2024-10-13,1,0,Domingo
+2024-10-14,0,1,Día de la Raza (observado)
+2024-10-20,1,0,Domingo
+2024-10-27,1,0,Domingo
+2024-11-03,1,0,Domingo
+2024-11-04,0,1,Día de Todos los Santos (observado)
+2024-11-10,1,0,Domingo
+2024-11-11,0,1,Independencia de Cartagena
+2024-11-17,1,0,Domingo
+2024-11-24,1,0,Domingo
+2024-12-01,1,0,Domingo
+2024-12-08,1,1,La Inmaculada Concepción
+2024-12-15,1,0,Domingo
+2024-12-22,1,0,Domingo
+2024-12-25,0,1,Navidad
+2024-12-29,1,0,Domingo
+2025-01-01,0,1,Año Nuevo
+2025-01-05,1,0,Domingo
+2025-01-06,0,1,Día de los Reyes Magos
+2025-01-12,1,0,Domingo
+2025-01-19,1,0,Domingo
+2025-01-26,1,0,Domingo
+2025-02-02,1,0,Domingo
+2025-02-09,1,0,Domingo
+2025-02-16,1,0,Domingo
+2025-02-23,1,0,Domingo
+2025-03-02,1,0,Domingo
+2025-03-09,1,0,Domingo
+2025-03-16,1,0,Domingo
+2025-03-23,1,0,Domingo
+2025-03-24,0,1,Día de San José (observado)
+2025-03-30,1,0,Domingo
+2025-04-06,1,0,Domingo
+2025-04-13,1,0,Domingo
+2025-04-17,0,1,Jueves Santo
+2025-04-18,0,1,Viernes Santo
+2025-04-20,1,0,Domingo
+2025-04-27,1,0,Domingo
+2025-05-01,0,1,Día del Trabajo
+2025-05-04,1,0,Domingo
+2025-05-11,1,0,Domingo
+2025-05-18,1,0,Domingo
+2025-05-25,1,0,Domingo
+2025-06-01,1,0,Domingo
+2025-06-02,0,1,Ascensión del señor (observado)
+2025-06-08,1,0,Domingo
+2025-06-15,1,0,Domingo
+2025-06-22,1,0,Domingo
+2025-06-23,0,1,Corpus Christi (observado)
+2025-06-29,1,0,Domingo
+2025-06-30,0,1,Sagrado Corazón (observado); San Pedro y San Pablo (observado)
+2025-07-06,1,0,Domingo
+2025-07-13,1,0,Domingo
+2025-07-20,1,1,Día de la Independencia
+2025-07-27,1,0,Domingo
+2025-08-03,1,0,Domingo
+2025-08-07,0,1,Batalla de Boyacá
+2025-08-10,1,0,Domingo
+2025-08-17,1,0,Domingo
+2025-08-18,0,1,La Asunción (observado)
+2025-08-24,1,0,Domingo
+2025-08-31,1,0,Domingo
+2025-09-07,1,0,Domingo
+2025-09-14,1,0,Domingo
+2025-09-21,1,0,Domingo
+2025-09-28,1,0,Domingo
+2025-10-05,1,0,Domingo
+2025-10-12,1,0,Domingo
+2025-10-13,0,1,Día de la Raza (observado)
+2025-10-19,1,0,Domingo
+2025-10-26,1,0,Domingo
+2025-11-02,1,0,Domingo
+2025-11-03,0,1,Día de Todos los Santos (observado)
+2025-11-09,1,0,Domingo
+2025-11-16,1,0,Domingo
+2025-11-17,0,1,Independencia de Cartagena (observado)
+2025-11-23,1,0,Domingo
+2025-11-30,1,0,Domingo
+2025-12-07,1,0,Domingo
+2025-12-08,0,1,La Inmaculada Concepción
+2025-12-14,1,0,Domingo
+2025-12-21,1,0,Domingo
+2025-12-25,0,1,Navidad
+2025-12-28,1,0,Domingo
+2026-01-01,0,1,Año Nuevo
+2026-01-04,1,0,Domingo
+2026-01-11,1,0,Domingo
+2026-01-12,0,1,Día de los Reyes Magos (observado)
+2026-01-18,1,0,Domingo
+2026-01-25,1,0,Domingo
+2026-02-01,1,0,Domingo
+2026-02-08,1,0,Domingo
+2026-02-15,1,0,Domingo
+2026-02-22,1,0,Domingo
+2026-03-01,1,0,Domingo
+2026-03-08,1,0,Domingo
+2026-03-15,1,0,Domingo
+2026-03-22,1,0,Domingo
+2026-03-23,0,1,Día de San José (observado)
+2026-03-29,1,0,Domingo
+2026-04-02,0,1,Jueves Santo
+2026-04-03,0,1,Viernes Santo
+2026-04-05,1,0,Domingo
+2026-04-12,1,0,Domingo
+2026-04-19,1,0,Domingo
+2026-04-26,1,0,Domingo
+2026-05-01,0,1,Día del Trabajo
+2026-05-03,1,0,Domingo
+2026-05-10,1,0,Domingo
+2026-05-17,1,0,Domingo
+2026-05-18,0,1,Ascensión del señor (observado)
+2026-05-24,1,0,Domingo
+2026-05-31,1,0,Domingo
+2026-06-07,1,0,Domingo
+2026-06-08,0,1,Corpus Christi (observado)
+2026-06-14,1,0,Domingo
+2026-06-15,0,1,Sagrado Corazón (observado)
+2026-06-21,1,0,Domingo
+2026-06-28,1,0,Domingo
+2026-06-29,0,1,San Pedro y San Pablo
+2026-07-05,1,0,Domingo
+2026-07-12,1,0,Domingo
+2026-07-19,1,0,Domingo
+2026-07-20,0,1,Día de la Independencia
+2026-07-26,1,0,Domingo
+2026-08-02,1,0,Domingo
+2026-08-07,0,1,Batalla de Boyacá
+2026-08-09,1,0,Domingo
+2026-08-16,1,0,Domingo
+2026-08-17,0,1,La Asunción (observado)
+2026-08-23,1,0,Domingo
+2026-08-30,1,0,Domingo
+2026-09-06,1,0,Domingo
+2026-09-13,1,0,Domingo
+2026-09-20,1,0,Domingo
+2026-09-27,1,0,Domingo
+2026-10-04,1,0,Domingo
+2026-10-11,1,0,Domingo
+2026-10-12,0,1,Día de la Raza
+2026-10-18,1,0,Domingo
+2026-10-25,1,0,Domingo
+2026-11-01,1,0,Domingo
+2026-11-02,0,1,Día de Todos los Santos (observado)
+2026-11-08,1,0,Domingo
+2026-11-15,1,0,Domingo
+2026-11-16,0,1,Independencia de Cartagena (observado)
+2026-11-22,1,0,Domingo
+2026-11-29,1,0,Domingo
+2026-12-06,1,0,Domingo
+2026-12-08,0,1,La Inmaculada Concepción
+2026-12-13,1,0,Domingo
+2026-12-20,1,0,Domingo
+2026-12-25,0,1,Navidad
+2026-12-27,1,0,Domingo
+2027-01-01,0,1,Año Nuevo
+2027-01-03,1,0,Domingo
+2027-01-10,1,0,Domingo
+2027-01-11,0,1,Día de los Reyes Magos (observado)
+2027-01-17,1,0,Domingo
+2027-01-24,1,0,Domingo
+2027-01-31,1,0,Domingo
+2027-02-07,1,0,Domingo
+2027-02-14,1,0,Domingo
+2027-02-21,1,0,Domingo
+2027-02-28,1,0,Domingo
+2027-03-07,1,0,Domingo
+2027-03-14,1,0,Domingo
+2027-03-21,1,0,Domingo
+2027-03-22,0,1,Día de San José (observado)
+2027-03-25,0,1,Jueves Santo
+2027-03-26,0,1,Viernes Santo
+2027-03-28,1,0,Domingo
+2027-04-04,1,0,Domingo
+2027-04-11,1,0,Domingo
+2027-04-18,1,0,Domingo
+2027-04-25,1,0,Domingo
+2027-05-01,0,1,Día del Trabajo
+2027-05-02,1,0,Domingo
+2027-05-09,1,0,Domingo
+2027-05-10,0,1,Ascensión del señor (observado)
+2027-05-16,1,0,Domingo
+2027-05-23,1,0,Domingo
+2027-05-30,1,0,Domingo
+2027-05-31,0,1,Corpus Christi (observado)
+2027-06-06,1,0,Domingo
+2027-06-07,0,1,Sagrado Corazón (observado)
+2027-06-13,1,0,Domingo
+2027-06-20,1,0,Domingo
+2027-06-27,1,0,Domingo
+2027-07-04,1,0,Domingo
+2027-07-05,0,1,San Pedro y San Pablo (observado)
+2027-07-11,1,0,Domingo
+2027-07-18,1,0,Domingo
+2027-07-20,0,1,Día de la Independencia
+2027-07-25,1,0,Domingo
+2027-08-01,1,0,Domingo
+2027-08-07,0,1,Batalla de Boyacá
+2027-08-08,1,0,Domingo
+2027-08-15,1,0,Domingo
+2027-08-16,0,1,La Asunción (observado)
+2027-08-22,1,0,Domingo
+2027-08-29,1,0,Domingo
+2027-09-05,1,0,Domingo
+2027-09-12,1,0,Domingo
+2027-09-19,1,0,Domingo
+2027-09-26,1,0,Domingo
+2027-10-03,1,0,Domingo
+2027-10-10,1,0,Domingo
+2027-10-17,1,0,Domingo
+2027-10-18,0,1,Día de la Raza (observado)
+2027-10-24,1,0,Domingo
+2027-10-31,1,0,Domingo
+2027-11-01,0,1,Día de Todos los Santos
+2027-11-07,1,0,Domingo
+2027-11-14,1,0,Domingo
+2027-11-15,0,1,Independencia de Cartagena (observado)
+2027-11-21,1,0,Domingo
+2027-11-28,1,0,Domingo
+2027-12-05,1,0,Domingo
+2027-12-08,0,1,La Inmaculada Concepción
+2027-12-12,1,0,Domingo
+2027-12-19,1,0,Domingo
+2027-12-25,0,1,Navidad
+2027-12-26,1,0,Domingo
+2028-01-01,0,1,Año Nuevo
+2028-01-02,1,0,Domingo
+2028-01-09,1,0,Domingo
+2028-01-10,0,1,Día de los Reyes Magos (observado)
+2028-01-16,1,0,Domingo
+2028-01-23,1,0,Domingo
+2028-01-30,1,0,Domingo
+2028-02-06,1,0,Domingo
+2028-02-13,1,0,Domingo
+2028-02-20,1,0,Domingo
+2028-02-27,1,0,Domingo
+2028-03-05,1,0,Domingo
+2028-03-12,1,0,Domingo
+2028-03-19,1,0,Domingo
+2028-03-20,0,1,Día de San José (observado)
+2028-03-26,1,0,Domingo
+2028-04-02,1,0,Domingo
+2028-04-09,1,0,Domingo
+2028-04-13,0,1,Jueves Santo
+2028-04-14,0,1,Viernes Santo
+2028-04-16,1,0,Domingo
+2028-04-23,1,0,Domingo
+2028-04-30,1,0,Domingo
+2028-05-01,0,1,Día del Trabajo
+2028-05-07,1,0,Domingo
+2028-05-14,1,0,Domingo
+2028-05-21,1,0,Domingo
+2028-05-28,1,0,Domingo
+2028-05-29,0,1,Ascensión del señor (observado)
+2028-06-04,1,0,Domingo
+2028-06-11,1,0,Domingo
+2028-06-18,1,0,Domingo
+2028-06-19,0,1,Corpus Christi (observado)
+2028-06-25,1,0,Domingo
+2028-06-26,0,1,Sagrado Corazón (observado)
+2028-07-02,1,0,Domingo
+2028-07-03,0,1,San Pedro y San Pablo (observado)
+2028-07-09,1,0,Domingo
+2028-07-16,1,0,Domingo
+2028-07-20,0,1,Día de la Independencia
+2028-07-23,1,0,Domingo
+2028-07-30,1,0,Domingo
+2028-08-06,1,0,Domingo
+2028-08-07,0,1,Batalla de Boyacá
+2028-08-13,1,0,Domingo
+2028-08-20,1,0,Domingo
+2028-08-21,0,1,La Asunción (observado)
+2028-08-27,1,0,Domingo
+2028-09-03,1,0,Domingo
+2028-09-10,1,0,Domingo
+2028-09-17,1,0,Domingo
+2028-09-24,1,0,Domingo
+2028-10-01,1,0,Domingo
+2028-10-08,1,0,Domingo
+2028-10-15,1,0,Domingo
+2028-10-16,0,1,Día de la Raza (observado)
+2028-10-22,1,0,Domingo
+2028-10-29,1,0,Domingo
+2028-11-05,1,0,Domingo
+2028-11-06,0,1,Día de Todos los Santos (observado)
+2028-11-12,1,0,Domingo
+2028-11-13,0,1,Independencia de Cartagena (observado)
+2028-11-19,1,0,Domingo
+2028-11-26,1,0,Domingo
+2028-12-03,1,0,Domingo
+2028-12-08,0,1,La Inmaculada Concepción
+2028-12-10,1,0,Domingo
+2028-12-17,1,0,Domingo
+2028-12-24,1,0,Domingo
+2028-12-25,0,1,Navidad
+2028-12-31,1,0,Domingo
+2029-01-01,0,1,Año Nuevo
+2029-01-07,1,0,Domingo
+2029-01-08,0,1,Día de los Reyes Magos (observado)
+2029-01-14,1,0,Domingo
+2029-01-21,1,0,Domingo
+2029-01-28,1,0,Domingo
+2029-02-04,1,0,Domingo
+2029-02-11,1,0,Domingo
+2029-02-18,1,0,Domingo
+2029-02-25,1,0,Domingo
+2029-03-04,1,0,Domingo
+2029-03-11,1,0,Domingo
+2029-03-18,1,0,Domingo
+2029-03-19,0,1,Día de San José
+2029-03-25,1,0,Domingo
+2029-03-29,0,1,Jueves Santo
+2029-03-30,0,1,Viernes Santo
+2029-04-01,1,0,Domingo
+2029-04-08,1,0,Domingo
+2029-04-15,1,0,Domingo
+2029-04-22,1,0,Domingo
+2029-04-29,1,0,Domingo
+2029-05-01,0,1,Día del Trabajo
+2029-05-06,1,0,Domingo
+2029-05-13,1,0,Domingo
+2029-05-14,0,1,Ascensión del señor (observado)
+2029-05-20,1,0,Domingo
+2029-05-27,1,0,Domingo
+2029-06-03,1,0,Domingo
+2029-06-04,0,1,Corpus Christi (observado)
+2029-06-10,1,0,Domingo
+2029-06-11,0,1,Sagrado Corazón (observado)
+2029-06-17,1,0,Domingo
+2029-06-24,1,0,Domingo
+2029-07-01,1,0,Domingo
+2029-07-02,0,1,San Pedro y San Pablo (observado)
+2029-07-08,1,0,Domingo
+2029-07-15,1,0,Domingo
+2029-07-20,0,1,Día de la Independencia
+2029-07-22,1,0,Domingo
+2029-07-29,1,0,Domingo
+2029-08-05,1,0,Domingo
+2029-08-07,0,1,Batalla de Boyacá
+2029-08-12,1,0,Domingo
+2029-08-19,1,0,Domingo
+2029-08-20,0,1,La Asunción (observado)
+2029-08-26,1,0,Domingo
+2029-09-02,1,0,Domingo
+2029-09-09,1,0,Domingo
+2029-09-16,1,0,Domingo
+2029-09-23,1,0,Domingo
+2029-09-30,1,0,Domingo
+2029-10-07,1,0,Domingo
+2029-10-14,1,0,Domingo
+2029-10-15,0,1,Día de la Raza (observado)
+2029-10-21,1,0,Domingo
+2029-10-28,1,0,Domingo
+2029-11-04,1,0,Domingo
+2029-11-05,0,1,Día de Todos los Santos (observado)
+2029-11-11,1,0,Domingo
+2029-11-12,0,1,Independencia de Cartagena (observado)
+2029-11-18,1,0,Domingo
+2029-11-25,1,0,Domingo
+2029-12-02,1,0,Domingo
+2029-12-08,0,1,La Inmaculada Concepción
+2029-12-09,1,0,Domingo
+2029-12-16,1,0,Domingo
+2029-12-23,1,0,Domingo
+2029-12-25,0,1,Navidad
+2029-12-30,1,0,Domingo
+2030-01-01,0,1,Año Nuevo
+2030-01-06,1,0,Domingo
+2030-01-07,0,1,Día de los Reyes Magos (observado)
+2030-01-13,1,0,Domingo
+2030-01-20,1,0,Domingo
+2030-01-27,1,0,Domingo
+2030-02-03,1,0,Domingo
+2030-02-10,1,0,Domingo
+2030-02-17,1,0,Domingo
+2030-02-24,1,0,Domingo
+2030-03-03,1,0,Domingo
+2030-03-10,1,0,Domingo
+2030-03-17,1,0,Domingo
+2030-03-24,1,0,Domingo
+2030-03-25,0,1,Día de San José (observado)
+2030-03-31,1,0,Domingo
+2030-04-07,1,0,Domingo
+2030-04-14,1,0,Domingo
+2030-04-18,0,1,Jueves Santo
+2030-04-19,0,1,Viernes Santo
+2030-04-21,1,0,Domingo
+2030-04-28,1,0,Domingo
+2030-05-01,0,1,Día del Trabajo
+2030-05-05,1,0,Domingo
+2030-05-12,1,0,Domingo
+2030-05-19,1,0,Domingo
+2030-05-26,1,0,Domingo
+2030-06-02,1,0,Domingo
+2030-06-03,0,1,Ascensión del señor (observado)
+2030-06-09,1,0,Domingo
+2030-06-16,1,0,Domingo
+2030-06-23,1,0,Domingo
+2030-06-24,0,1,Corpus Christi (observado)
+2030-06-30,1,0,Domingo
+2030-07-01,0,1,Sagrado Corazón (observado); San Pedro y San Pablo (observado)
+2030-07-07,1,0,Domingo
+2030-07-14,1,0,Domingo
+2030-07-20,0,1,Día de la Independencia
+2030-07-21,1,0,Domingo
+2030-07-28,1,0,Domingo
+2030-08-04,1,0,Domingo
+2030-08-07,0,1,Batalla de Boyacá
+2030-08-11,1,0,Domingo
+2030-08-18,1,0,Domingo
+2030-08-19,0,1,La Asunción (observado)
+2030-08-25,1,0,Domingo
+2030-09-01,1,0,Domingo
+2030-09-08,1,0,Domingo
+2030-09-15,1,0,Domingo
+2030-09-22,1,0,Domingo
+2030-09-29,1,0,Domingo
+2030-10-06,1,0,Domingo
+2030-10-13,1,0,Domingo
+2030-10-14,0,1,Día de la Raza (observado)
+2030-10-20,1,0,Domingo
+2030-10-27,1,0,Domingo
+2030-11-03,1,0,Domingo
+2030-11-04,0,1,Día de Todos los Santos (observado)
+2030-11-10,1,0,Domingo
+2030-11-11,0,1,Independencia de Cartagena
+2030-11-17,1,0,Domingo
+2030-11-24,1,0,Domingo
+2030-12-01,1,0,Domingo
+2030-12-08,1,1,La Inmaculada Concepción
+2030-12-15,1,0,Domingo
+2030-12-22,1,0,Domingo
+2030-12-25,0,1,Navidad
+2030-12-29,1,0,Domingo
