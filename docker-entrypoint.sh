@@ -20,4 +20,8 @@ fi
 # 2. Drop de privilegios y ejecutar el CMD como `nutri`. Usamos runuser en
 # vez de su porque no requiere PAM y propaga SIGTERM al proceso hijo, lo
 # que permite que Railway haga restart limpio de uvicorn.
-exec runuser -u nutri -- sh -c "exec $*"
+#
+# `"$@"` preserva cada argumento del CMD como uno separado; usar `$*` los
+# concatena y rompe el paso a `sh -c` (uvicorn recibiria solo "uvicorn"
+# sin "app.api.main:app --host ... --port ...").
+exec runuser -u nutri -- "$@"
