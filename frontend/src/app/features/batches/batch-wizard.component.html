@@ -1,303 +1,440 @@
-<div class="nutri-page nutri-stack">
-  <div>
-    <h1 class="nutri-section-title" style="margin: 0;">Nuevo batch</h1>
-    <p class="nutri-muted" style="margin: 4px 0 0;">
-      Sube los PRE CORTE del mes, el FLASH mensual, revisa el preview y genera los reportes.
-    </p>
-  </div>
+﻿<div class="nutri-page nutri-stack">
+  <header class="nutri-page-header">
+    <div>
+      <p class="nutri-eyebrow">Flujo mensual</p>
+      <h1 class="nutri-page-header__title">Nuevo batch</h1>
+      <p class="nutri-page-header__subtitle">
+        Sube los PRE CORTE del mes, el FLASH mensual, revisa el preview y
+        genera los reportes de cumplimiento en cinco pasos.
+      </p>
+    </div>
+  </header>
 
-  <div class="nutri-card">
+  <div class="nutri-card wizard-card">
     <mat-stepper #stepper linear labelPosition="bottom"
                  (selectionChange)="onStepChange($event)">
 
       <!-- Paso 1: Nombrar batch -->
       <mat-step [stepControl]="step1" label="Nombrar">
-        <form [formGroup]="step1" (ngSubmit)="createBatch()">
-          <p class="nutri-muted">Elige un nombre descriptivo (ej: "Febrero 2026").</p>
-          <mat-form-field appearance="outline" style="width: 100%; max-width: 480px;">
-            <mat-label>Nombre del batch</mat-label>
-            <input matInput formControlName="nombre" placeholder="Febrero 2026" />
-          </mat-form-field>
-          <div style="margin-top: 12px;">
-            <button mat-flat-button color="primary" type="submit"
-                    [disabled]="step1.invalid || busy()">
-              Crear y continuar
-            </button>
+        <div class="wizard-step">
+          <div class="wizard-step__head">
+            <h2 class="wizard-step__title">Nombra el batch</h2>
+            <p class="wizard-step__desc">
+              Elige un nombre descriptivo. Sugerimos usar el mes y anio (por
+              ejemplo, "Febrero 2026") para que el equipo lo identifique
+              facilmente en el dashboard.
+            </p>
           </div>
-          @if (busy()) { <mat-progress-bar mode="indeterminate"></mat-progress-bar> }
-        </form>
+
+          <form [formGroup]="step1" (ngSubmit)="createBatch()" class="wizard-step__body">
+            <mat-form-field appearance="outline" class="wizard-field-wide">
+              <mat-label>Nombre del batch</mat-label>
+              <input matInput formControlName="nombre" placeholder="Febrero 2026" />
+            </mat-form-field>
+
+            <div class="nutri-actions">
+              <button mat-flat-button color="primary" type="submit"
+                      [disabled]="step1.invalid || busy()">
+                <mat-icon>arrow_forward</mat-icon>
+                Crear y continuar
+              </button>
+              @if (busy()) {
+                <mat-spinner diameter="20"></mat-spinner>
+              }
+            </div>
+          </form>
+        </div>
       </mat-step>
 
       <!-- Paso 2: Subir pre_cortes -->
       <mat-step label="PRE CORTES">
-        <p class="nutri-muted">
-          Sube uno o varios archivos <strong>.xlsx</strong> de PRE CORTE
-          (o un <strong>.zip</strong> con muchos). El sistema extrae la
-          fecha del nombre y, si cae en domingo/festivo, la reasigna al
-          proximo dia habil.
-        </p>
+        <div class="wizard-step">
+          <div class="wizard-step__head">
+            <h2 class="wizard-step__title">Sube los archivos PRE CORTE</h2>
+            <p class="wizard-step__desc">
+              Acepta uno o varios archivos <strong>.xlsx</strong> o un
+              <strong>.zip</strong> con muchos. El sistema extrae la fecha del
+              nombre y, si cae en domingo o festivo, la reasigna al proximo
+              dia habil.
+            </p>
+          </div>
 
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button mat-flat-button color="primary" type="button" (click)="fileInput.click()">
-            <mat-icon>upload</mat-icon>
-            Subir archivos (xlsx o zip)
-          </button>
-          <input #fileInput type="file" multiple hidden
-                 accept=".xlsx,.xlsm,.zip" (change)="onFilesSelected($event)" />
-          @if (busy()) { <mat-spinner diameter="24"></mat-spinner> }
-        </div>
+          <div class="wizard-step__body">
+            <div class="nutri-actions">
+              <button mat-flat-button color="primary" type="button" (click)="fileInput.click()">
+                <mat-icon>upload_file</mat-icon>
+                Seleccionar archivos (xlsx o zip)
+              </button>
+              <input #fileInput type="file" multiple hidden
+                     accept=".xlsx,.xlsm,.zip" (change)="onFilesSelected($event)" />
+              @if (busy()) { <mat-spinner diameter="20"></mat-spinner> }
+            </div>
 
-        @if (zipReport(); as z) {
-          <div style="margin-top: 12px;">
-            @if (z.procesados.length > 0) {
-              <p><span class="nutri-badge good">
-                {{ z.procesados.length }} procesados
-              </span></p>
-            }
-            @if (z.ignorados.length > 0) {
-              <p><span class="nutri-badge warn">
-                {{ z.ignorados.length }} ignorados
-              </span></p>
-              <ul style="margin: 4px 0; font-size: 12px;">
-                @for (i of z.ignorados; track i.filename) {
-                  <li><strong>{{ i.filename }}</strong>: {{ i.motivo }}</li>
+            @if (zipReport(); as z) {
+              <div class="wizard-zip-report">
+                @if (z.procesados.length > 0) {
+                  <span class="nutri-badge good">
+                    <mat-icon>check</mat-icon>
+                    {{ z.procesados.length }} procesados
+                  </span>
                 }
-              </ul>
+                @if (z.ignorados.length > 0) {
+                  <div class="nutri-alert warn">
+                    <mat-icon>warning_amber</mat-icon>
+                    <div class="nutri-alert__body">
+                      <p class="nutri-alert__title">
+                        {{ z.ignorados.length }} archivo(s) ignorado(s) del ZIP
+                      </p>
+                      <ul>
+                        @for (i of z.ignorados; track i.filename) {
+                          <li><strong>{{ i.filename }}</strong>: {{ i.motivo }}</li>
+                        }
+                      </ul>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (batch() && batch()!.pre_cortes.length > 0) {
+              <div class="nutri-table-wrap">
+                <table class="nutri-table">
+                  <thead>
+                    <tr>
+                      <th>Archivo</th>
+                      <th>Fecha archivo</th>
+                      <th>Fecha produccion</th>
+                      <th class="num">Filas</th>
+                      <th style="width: 60px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (pc of batch()!.pre_cortes; track pc.carga_id) {
+                      <tr>
+                        <td>{{ pc.filename }}</td>
+                        <td class="nutri-muted">{{ pc.fecha_archivo }}</td>
+                        <td><strong>{{ pc.fecha_produccion }}</strong></td>
+                        <td class="num">{{ pc.num_filas_original }}</td>
+                        <td>
+                          <button mat-icon-button color="warn"
+                                  (click)="removePreCorte(pc.carga_id)"
+                                  matTooltip="Eliminar" aria-label="Eliminar">
+                            <mat-icon>delete_outline</mat-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else if (batch()) {
+              <div class="nutri-empty">
+                <div class="nutri-empty__icon"><mat-icon>upload_file</mat-icon></div>
+                <p class="nutri-empty__title">Ningun archivo cargado aun</p>
+                <p class="nutri-empty__body">
+                  Usa el boton de arriba para subir los PRE CORTE del mes.
+                </p>
+              </div>
             }
           </div>
-        }
 
-        @if (batch() && batch()!.pre_cortes.length > 0) {
-          <table class="nutri-table" style="margin-top: 16px;">
-            <thead>
-              <tr>
-                <th>Archivo</th>
-                <th>Fecha archivo</th>
-                <th>Fecha produccion</th>
-                <th class="num">Filas</th>
-                <th style="width: 80px;"></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (pc of batch()!.pre_cortes; track pc.carga_id) {
-                <tr>
-                  <td>{{ pc.filename }}</td>
-                  <td>{{ pc.fecha_archivo }}</td>
-                  <td><strong>{{ pc.fecha_produccion }}</strong></td>
-                  <td class="num">{{ pc.num_filas_original }}</td>
-                  <td>
-                    <button mat-icon-button color="warn" (click)="removePreCorte(pc.carga_id)">
-                      <mat-icon>delete</mat-icon>
-                    </button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        }
-
-        <div style="margin-top: 12px;">
-          <button mat-button matStepperPrevious type="button">Atras</button>
-          <button mat-flat-button color="primary" matStepperNext type="button"
-                  [disabled]="!batch() || batch()!.pre_cortes.length === 0">
-            Continuar
-          </button>
+          <div class="nutri-actions wizard-step__footer">
+            <button mat-button matStepperPrevious type="button">
+              <mat-icon>arrow_back</mat-icon>
+              Atras
+            </button>
+            <span class="nutri-actions-divider"></span>
+            <button mat-flat-button color="primary" matStepperNext type="button"
+                    [disabled]="!batch() || batch()!.pre_cortes.length === 0">
+              <mat-icon>arrow_forward</mat-icon>
+              Continuar
+            </button>
+          </div>
         </div>
       </mat-step>
 
       <!-- Paso 3: Subir flash con periodo -->
       <mat-step [stepControl]="step3" label="FLASH mensual">
-        <p class="nutri-muted">
-          El archivo FLASH no lleva la fecha en el nombre. Indica a que
-          mes corresponde antes de subir.
-        </p>
-        <form [formGroup]="step3" style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <mat-form-field appearance="outline">
-            <mat-label>Anio</mat-label>
-            <mat-select formControlName="year">
-              @for (y of yearsOpt; track y) { <mat-option [value]="y">{{ y }}</mat-option> }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Mes</mat-label>
-            <mat-select formControlName="month">
-              @for (m of monthsOpt; track m.v) { <mat-option [value]="m.v">{{ m.l }}</mat-option> }
-            </mat-select>
-          </mat-form-field>
-        </form>
-
-        <div style="margin-top: 8px;">
-          <button mat-flat-button color="primary" type="button" (click)="flashInput.click()"
-                  [disabled]="step3.invalid">
-            <mat-icon>upload</mat-icon>
-            Subir FLASH (xlsx o csv)
-          </button>
-          <input #flashInput type="file" hidden
-                 accept=".xlsx,.xlsm,.csv" (change)="onFlashSelected($event)" />
-          @if (busy()) { <mat-spinner diameter="24" style="display: inline-block; margin-left: 8px;"></mat-spinner> }
-        </div>
-
-        @if (batch()?.flash) {
-          <div style="margin-top: 12px;">
-            <span class="nutri-badge info">
-              {{ batch()!.flash!.filename }} — periodo
-              {{ batch()!.flash!.periodo_year }}-{{ batch()!.flash!.periodo_month }}
-            </span>
+        <div class="wizard-step">
+          <div class="wizard-step__head">
+            <h2 class="wizard-step__title">Carga el FLASH del mes</h2>
+            <p class="wizard-step__desc">
+              El archivo FLASH no lleva la fecha en el nombre. Indica a que
+              mes corresponde antes de subirlo para que el sistema valide
+              coherencia del periodo.
+            </p>
           </div>
-        }
 
-        <div style="margin-top: 12px;">
-          <button mat-button matStepperPrevious type="button">Atras</button>
-          <button mat-flat-button color="primary" matStepperNext type="button"
-                  [disabled]="!batch()?.flash" (click)="loadPreview()">
-            Continuar al preview
-          </button>
+          <div class="wizard-step__body">
+            <form [formGroup]="step3" class="wizard-flash-form">
+              <mat-form-field appearance="outline">
+                <mat-label>Anio</mat-label>
+                <mat-select formControlName="year">
+                  @for (y of yearsOpt; track y) { <mat-option [value]="y">{{ y }}</mat-option> }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Mes</mat-label>
+                <mat-select formControlName="month">
+                  @for (m of monthsOpt; track m.v) { <mat-option [value]="m.v">{{ m.l }}</mat-option> }
+                </mat-select>
+              </mat-form-field>
+            </form>
+
+            <div class="nutri-actions">
+              <button mat-flat-button color="primary" type="button" (click)="flashInput.click()"
+                      [disabled]="step3.invalid">
+                <mat-icon>upload_file</mat-icon>
+                Subir FLASH (xlsx o csv)
+              </button>
+              <input #flashInput type="file" hidden
+                     accept=".xlsx,.xlsm,.csv" (change)="onFlashSelected($event)" />
+              @if (busy()) { <mat-spinner diameter="20"></mat-spinner> }
+            </div>
+
+            @if (batch()?.flash) {
+              <div class="nutri-alert good">
+                <mat-icon>task_alt</mat-icon>
+                <div class="nutri-alert__body">
+                  <p class="nutri-alert__title">FLASH cargado</p>
+                  <p>
+                    <strong>{{ batch()!.flash!.filename }}</strong>
+                    &nbsp;Â·&nbsp; periodo
+                    <strong>{{ batch()!.flash!.periodo_year }}-{{ batch()!.flash!.periodo_month | number:'2.0-0' }}</strong>
+                  </p>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="nutri-actions wizard-step__footer">
+            <button mat-button matStepperPrevious type="button">
+              <mat-icon>arrow_back</mat-icon>
+              Atras
+            </button>
+            <span class="nutri-actions-divider"></span>
+            <button mat-flat-button color="primary" matStepperNext type="button"
+                    [disabled]="!batch()?.flash" (click)="loadPreview()">
+              <mat-icon>arrow_forward</mat-icon>
+              Continuar al preview
+            </button>
+          </div>
         </div>
       </mat-step>
 
       <!-- Paso 4: Preview -->
       <mat-step label="Preview">
-        <h2 class="nutri-section-title" style="margin: 0 0 12px 0;">
-          Preview del batch
-        </h2>
-
-        @if (busy()) {
-          <div style="text-align: center; padding: 24px;">
-            <mat-spinner diameter="40"></mat-spinner>
-            <p class="nutri-muted" style="margin-top: 12px;">
-              Ejecutando match en memoria contra el FLASH...
+        <div class="wizard-step">
+          <div class="wizard-step__head">
+            <h2 class="wizard-step__title">Revisa el resultado del match</h2>
+            <p class="wizard-step__desc">
+              El calculo se hace en memoria contra el FLASH. Nada se persiste
+              hasta que confirmes en el siguiente paso.
             </p>
           </div>
-        }
 
-        @if (!busy() && !preview()) {
-          <div class="nutri-card" style="text-align: center; padding: 24px;">
-            <p class="nutri-muted" style="margin: 0 0 12px 0;">
-              Aun no se ha cargado el preview. Puedes disparar el calculo manualmente:
-            </p>
-            <button mat-flat-button color="primary" type="button" (click)="loadPreview()">
-              <mat-icon>refresh</mat-icon>
-              Cargar preview
-            </button>
-          </div>
-        }
-
-        @if (preview(); as p) {
-          @if (p.flash_periodo_mensajes.length > 0) {
-            @for (m of p.flash_periodo_mensajes; track m) {
-              <p class="nutri-badge warn" style="display: block; margin-bottom: 8px;">{{ m }}</p>
+          <div class="wizard-step__body">
+            @if (busy()) {
+              <div class="nutri-loading">
+                <mat-spinner diameter="40"></mat-spinner>
+                <span>Ejecutando match en memoria contra el FLASH...</span>
+              </div>
             }
-          }
 
-          @if (p.colisiones.length > 0) {
-            <div class="nutri-badge bad" style="display: block; margin-bottom: 12px;">
-              Hay {{ p.colisiones.length }} colision(es) de fecha:
-              @for (c of p.colisiones; track c.fecha) {
-                <div>{{ c.fecha }} — pre_cortes: {{ c.pre_corte_carga_ids.join(', ') }}</div>
-              }
-              Debes eliminar los duplicados en el paso anterior antes de continuar.
-            </div>
-          }
+            @if (!busy() && !preview()) {
+              <div class="nutri-empty">
+                <div class="nutri-empty__icon"><mat-icon>visibility</mat-icon></div>
+                <p class="nutri-empty__title">Preview aun no calculado</p>
+                <p class="nutri-empty__body">
+                  Puedes disparar el calculo manualmente si el auto-load no lo hizo.
+                </p>
+                <button mat-flat-button color="primary" type="button" (click)="loadPreview()">
+                  <mat-icon>refresh</mat-icon>
+                  Cargar preview
+                </button>
+              </div>
+            }
 
-          @if (p.fechas_no_laborales_saltadas.length > 0) {
-            <div class="nutri-badge info" style="display: block; margin-bottom: 12px;">
-              {{ p.fechas_no_laborales_saltadas.length }} PRE CORTE(s) reasignados a proximo dia habil:
-              @for (s of p.fechas_no_laborales_saltadas; track s.filename) {
-                <div>
-                  <strong>{{ s.filename }}</strong> -> {{ s.fecha_produccion_resuelta }}
-                  ({{ s.dias_saltados }} dia(s) saltado(s))
+            @if (preview(); as p) {
+              @if (p.flash_periodo_mensajes.length > 0) {
+                <div class="nutri-alert warn">
+                  <mat-icon>warning_amber</mat-icon>
+                  <div class="nutri-alert__body">
+                    <p class="nutri-alert__title">Revisar coherencia del FLASH</p>
+                    <ul>
+                      @for (m of p.flash_periodo_mensajes; track m) {
+                        <li>{{ m }}</li>
+                      }
+                    </ul>
+                  </div>
                 </div>
               }
-            </div>
-          }
 
-          @if (p.dias.length === 0) {
-            <div class="nutri-card" style="padding: 16px;">
-              <p class="nutri-muted" style="margin: 0;">
-                No se pudo calcular ningun dia. Revisa que los pre_cortes y el
-                flash sean coherentes:
-              </p>
-              <ul style="margin: 8px 0 0 0; font-size: 13px;">
-                <li>El FLASH debe contener facturas del periodo declarado.</li>
-                <li>Al menos un pre_corte debe apuntar a un dia habil que aparezca en el FLASH.</li>
-                <li>Verifica los mensajes de arriba (warning) si los hay.</li>
-              </ul>
-            </div>
-          } @else {
-            <table class="nutri-table">
-              <thead>
-                <tr>
-                  <th>Fecha produccion</th>
-                  <th class="num">Materiales</th>
-                  <th class="num">Plan</th>
-                  <th class="num">Real</th>
-                  <th class="num">Delta</th>
-                  <th class="num">Cumplimiento</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (d of p.dias; track d.fecha_produccion) {
-                  <tr>
-                    <td><strong>{{ d.fecha_produccion }}</strong></td>
-                    <td class="num">{{ d.materiales_matched }}</td>
-                    <td class="num">{{ d.plan_total | number:'1.0-0' }}</td>
-                    <td class="num">{{ d.real_total | number:'1.0-0' }}</td>
-                    <td class="num">{{ d.delta_total | number:'1.0-0' }}</td>
-                    <td class="pct" [class]="cumplTier(d.cumplimiento_pct)">
-                      {{ (d.cumplimiento_pct * 100) | number:'1.2-2' }}%
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
-        }
+              @if (p.colisiones.length > 0) {
+                <div class="nutri-alert bad">
+                  <mat-icon>error_outline</mat-icon>
+                  <div class="nutri-alert__body">
+                    <p class="nutri-alert__title">
+                      {{ p.colisiones.length }} colision(es) de fecha
+                    </p>
+                    <ul>
+                      @for (c of p.colisiones; track c.fecha) {
+                        <li>
+                          <strong>{{ c.fecha }}</strong> â€” pre_cortes:
+                          {{ c.pre_corte_carga_ids.join(', ') }}
+                        </li>
+                      }
+                    </ul>
+                    <p>Debes eliminar los duplicados en el paso anterior antes de continuar.</p>
+                  </div>
+                </div>
+              }
 
-        <div style="margin-top: 16px;">
-          <button mat-button matStepperPrevious type="button">Atras</button>
-          <button mat-stroked-button type="button" (click)="loadPreview()"
-                  style="margin-left: 8px;">
-            <mat-icon>refresh</mat-icon>
-            Recargar preview
-          </button>
-          <button mat-flat-button color="primary" matStepperNext type="button"
-                  style="margin-left: 8px;"
-                  [disabled]="!preview()?.listo_para_confirmar">
-            Estoy de acuerdo, continuar
-          </button>
+              @if (p.fechas_no_laborales_saltadas.length > 0) {
+                <div class="nutri-alert info">
+                  <mat-icon>event_available</mat-icon>
+                  <div class="nutri-alert__body">
+                    <p class="nutri-alert__title">
+                      {{ p.fechas_no_laborales_saltadas.length }} PRE CORTE(s) reasignados a proximo dia habil
+                    </p>
+                    <ul>
+                      @for (s of p.fechas_no_laborales_saltadas; track s.filename) {
+                        <li>
+                          <strong>{{ s.filename }}</strong> â†’ {{ s.fecha_produccion_resuelta }}
+                          <span class="nutri-muted">({{ s.dias_saltados }} dia(s) saltado(s))</span>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              }
+
+              @if (p.dias.length === 0) {
+                <div class="nutri-alert warn">
+                  <mat-icon>help_outline</mat-icon>
+                  <div class="nutri-alert__body">
+                    <p class="nutri-alert__title">No se pudo calcular ningun dia</p>
+                    <ul>
+                      <li>El FLASH debe contener facturas del periodo declarado.</li>
+                      <li>Al menos un pre_corte debe apuntar a un dia habil que aparezca en el FLASH.</li>
+                      <li>Verifica los mensajes de arriba (warning) si los hay.</li>
+                    </ul>
+                  </div>
+                </div>
+              } @else {
+                <div class="nutri-table-wrap">
+                  <table class="nutri-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha produccion</th>
+                        <th class="num">Materiales</th>
+                        <th class="num">Plan</th>
+                        <th class="num">Real</th>
+                        <th class="num">Delta</th>
+                        <th class="num">Cumplimiento</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (d of p.dias; track d.fecha_produccion) {
+                        <tr>
+                          <td><strong>{{ d.fecha_produccion }}</strong></td>
+                          <td class="num">{{ d.materiales_matched }}</td>
+                          <td class="num">{{ d.plan_total | number:'1.0-0' }}</td>
+                          <td class="num">{{ d.real_total | number:'1.0-0' }}</td>
+                          <td class="num">{{ d.delta_total | number:'1.0-0' }}</td>
+                          <td class="pct" [class]="cumplTier(d.cumplimiento_pct)">
+                            {{ (d.cumplimiento_pct * 100) | number:'1.2-2' }}%
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            }
+          </div>
+
+          <div class="nutri-actions wizard-step__footer">
+            <button mat-button matStepperPrevious type="button">
+              <mat-icon>arrow_back</mat-icon>
+              Atras
+            </button>
+            <button mat-stroked-button type="button" (click)="loadPreview()">
+              <mat-icon>refresh</mat-icon>
+              Recargar preview
+            </button>
+            <span class="nutri-actions-divider"></span>
+            <button mat-flat-button color="primary" matStepperNext type="button"
+                    [disabled]="!preview()?.listo_para_confirmar">
+              <mat-icon>check</mat-icon>
+              Estoy de acuerdo, continuar
+            </button>
+          </div>
         </div>
       </mat-step>
 
       <!-- Paso 5: Confirmar + generar -->
       <mat-step label="Generar">
-        @if (!generateResult()) {
-          <p>
-            Al confirmar, el sistema persiste el match, genera un archivo Excel
-            por cada dia + un consolidado + un ZIP con todo, y los deja listos
-            para descargar.
-          </p>
-          <button mat-flat-button color="primary" type="button"
-                  [disabled]="busy()" (click)="confirmAndGenerate()">
-            <mat-icon>check</mat-icon>
-            Confirmar y generar reportes
-          </button>
-          @if (busy()) {
-            <mat-progress-bar mode="indeterminate" style="margin-top: 12px;"></mat-progress-bar>
-          }
-        } @else {
-          <div class="nutri-badge good" style="font-size: 14px; display: block; padding: 12px;">
-            Reportes generados
+        <div class="wizard-step">
+          <div class="wizard-step__head">
+            <h2 class="wizard-step__title">Confirmar y generar reportes</h2>
+            <p class="wizard-step__desc">
+              Al confirmar, el sistema persiste el match, genera un archivo
+              Excel por cada dia, un consolidado mensual y un ZIP con todo.
+            </p>
           </div>
-          <ul>
-            <li>Consolidado: <strong>{{ generateResult()!.consolidado }}</strong></li>
-            <li>ZIP: <strong>{{ generateResult()!.zip }}</strong></li>
-          </ul>
-          <button mat-flat-button color="primary" type="button" (click)="goToDownloads()">
-            <mat-icon>download</mat-icon>
-            Ir a descargas
-          </button>
-        }
+
+          <div class="wizard-step__body">
+            @if (!generateResult()) {
+              <div class="nutri-alert info">
+                <mat-icon>info</mat-icon>
+                <div class="nutri-alert__body">
+                  <p class="nutri-alert__title">Esta accion es idempotente</p>
+                  <p>
+                    Si vuelves a generar el mismo par (pre_corte, flash), el
+                    resultado sera el mismo. No se duplica el cruce en la
+                    base de datos.
+                  </p>
+                </div>
+              </div>
+
+              <div class="nutri-actions">
+                <button mat-flat-button color="primary" type="button"
+                        [disabled]="busy()" (click)="confirmAndGenerate()">
+                  <mat-icon>rocket_launch</mat-icon>
+                  Confirmar y generar reportes
+                </button>
+                @if (busy()) {
+                  <mat-spinner diameter="20"></mat-spinner>
+                }
+              </div>
+
+              @if (busy()) {
+                <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              }
+            } @else {
+              <div class="nutri-alert good">
+                <mat-icon>check_circle</mat-icon>
+                <div class="nutri-alert__body">
+                  <p class="nutri-alert__title">Reportes generados exitosamente</p>
+                  <ul>
+                    <li>Consolidado: <strong>{{ generateResult()!.consolidado }}</strong></li>
+                    <li>ZIP: <strong>{{ generateResult()!.zip }}</strong></li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="nutri-actions">
+                <button mat-flat-button color="primary" type="button" (click)="goToDownloads()">
+                  <mat-icon>download</mat-icon>
+                  Ir a descargas
+                </button>
+              </div>
+            }
+          </div>
+        </div>
       </mat-step>
     </mat-stepper>
   </div>
 </div>
+

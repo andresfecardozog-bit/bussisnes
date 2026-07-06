@@ -150,6 +150,10 @@ Compromisos no negociables:
  no la SPA. Usar el dominio de produccion o desactivar la proteccion en
  Vercel dashboard. Troubleshooting completo en
  [docs/deploy_vercel.md](docs/deploy_vercel.md#troubleshooting-pagina-en-blanco).
+- [x] **Fase 7C.2** - Rediseno visual corporativo NutriAvicola (2026-07-06):
+ sistema de design tokens explicitos + refactor de los 5 componentes.
+ Anti-glass total (sin backdrop-filter, sin transparencias). Detalle en
+ la seccion "Fase 7C.2 - Rediseno visual corporativo (2026-07-06)".
 ---
 
 ## Fase 4 - resumen de lo entregado (2026-07-02)
@@ -543,6 +547,181 @@ colisiones, flujo E2E completo, path traversal bloqueado.
 `batches.py` para que ademas de escribir localmente escriban al
 `StorageAdapter.get()`. Con `LocalStorage` es no-op. Con `SupabaseStorage`
 los blobs viajan a Supabase y las descargas usan signed URLs.
+
+---
+
+## Fase 7C.2 - Rediseno visual corporativo (2026-07-06)
+
+**Contexto:** el rediseno anterior (Fase 7C base) era funcional pero
+visualmente pobre: inline styles por todos lados, hex hardcodeados en
+componentes, badges reutilizados como alerts, KPIs sin jerarquia visual,
+tablas planas. El logo NutriAvicola (naranja "N" + texto navy) se veia
+apagado directamente sobre el toolbar navy. La app funcionaba pero no
+transmitia "software empresarial serio".
+
+**Filosofia visual:** sobria, corporativa, B2B. Referencias mentales:
+Salesforce Lightning, Vercel Dashboard (sin la parte glass), reportes
+Deloitte, Bloomberg Terminal moderna. Superficies solidas, bordes 1px,
+elevacion sutil, radios moderados (4-8 px), naranja como acento
+puntual (nunca dominante). El semaforo verde/amarillo/rojo queda
+reservado para KPIs de cumplimiento.
+
+### Restricciones duras que respetamos
+
+- **Anti-glass**: cero `backdrop-filter: blur(...)`, cero fondos
+ semi-transparentes tipo `rgba(_,_,_, 0.x)` a nivel de componente.
+ Las unicas transparencias son para el hover state layer del toolbar
+ (rgba blanco sobre navy) que es intencional para no romper Material.
+- **Logo bien contrastado**: el logo va dentro de un chip blanco
+ (`.nutri-brand__logo-wrap`) con `background: #FFFFFF` y radius 6 px,
+ anclado en la esquina izquierda del toolbar. Asi el naranja de la
+ "N" y el navy del texto se leen perfectamente.
+- **Paleta corporativa**: navy `#0F2E4C` y naranja `#E87722` como
+ nucleos; el resto son shades derivados (50/100/200/300/400/500/600/
+ 700/800/900 para navy, orange y gray).
+- **Sin dependencies nuevas**: solo CSS + Material Angular existente.
+ Sin framer-motion, sin gsap, sin fuentes Google externas (Roboto ya
+ viene con Material 3 y se sirve como está en `<head>` — no se agrego
+ nada nuevo).
+
+### Design tokens agregados
+
+Todos en [frontend/src/styles.scss](frontend/src/styles.scss) como CSS
+custom properties, accesibles desde cualquier componente sin `@import`:
+
+**Paleta ampliada (10 shades por familia)**:
+- `--nutri-navy-{50..900}` — 10 shades del navy corporativo.
+- `--nutri-orange-{50..900}` — 10 shades del naranja acento.
+- `--nutri-gray-{25,50,100..900}` — 11 shades neutros.
+- `--nutri-sem-{good,warn,bad,info}-{solid,bg,fg,border}` — 4 variantes
+ por semaforo (semaphore) para poder usar en badges, alerts, tablas.
+
+**Spacing (escala 4 px)**: `--space-1` (4px) .. `--space-16` (64px), con
+`--space-{1,2,3,4,5,6,7,8,10,12,16}`.
+
+**Typography**: `--fs-xs` (12) .. `--fs-3xl` (32) con line-heights
+`--lh-{tight,snug,normal,loose}` y pesos `--fw-{regular,medium,semibold,bold}`.
+
+**Radios**: `--radius-xs` (3), `--radius-sm` (4), `--radius-md` (6),
+`--radius-lg` (8), `--radius-xl` (12), `--radius-pill` (999). Ningun
+elemento > 12 px salvo pills de status.
+
+**Elevacion (5 niveles)**: `--elev-1` .. `--elev-5` con sombras tintadas
+al navy corporativo (`rgba(15, 46, 76, .06)` etc.), para evitar sombras
+grises frias que rompen la cohesion cromatica.
+
+**Motion**: `--dur-{fast,normal,slow}` (100/150/250 ms) +
+`--ease-standard`, `--ease-emph` (cubic-bezier). Transiciones solo en
+hover de botones/cards, cambios de estado del stepper.
+
+**Superficies semanticas**: `--nutri-bg-{app,surface,subtle,emphasis,
+emphasis-2}`, `--nutri-text-{primary,secondary,muted,on-emphasis,brand}`,
+`--nutri-border-{default,strong,brand,accent}`.
+
+**Compat legacy**: los tokens antiguos (`--nutri-navy`, `--nutri-orange`,
+`--nutri-good`, etc.) siguen expuestos como aliases del nuevo sistema
+para no romper ningun consumidor externo.
+
+### Utilitarias refactorizadas / nuevas
+
+- `.nutri-page` — contenedor centrado, ancho maximo 1280 px, padding
+ `--space-8` vertical + `--space-6` horizontal.
+- `.nutri-page-header` (nueva) — con sub-elementos `__title`,
+ `__subtitle`, `__actions` para header consistente en las 4 rutas.
+- `.nutri-eyebrow` (nueva) — kicker en mayusculas encima del titulo.
+- `.nutri-card` — superficie solida, borde 1px gray-200, radius 8, sombra
+ sutil elev-1. Sin transparencias. Variantes: `--flush`, `--tight`,
+ `--featured` (con banda lateral naranja para acciones destacadas).
+- `.nutri-card-header` (nueva) — layout titulo + acciones inline.
+- `.nutri-toolbar` — altura fija 64 px, padding horizontal, borde inferior
+ navy-700, sombra elev-2.
+- `.nutri-brand` (nueva) — logo chip blanco + titulo con eyebrow
+ (`NutriAvicola BI` + `Cumplimiento PRE CORTE vs FLASH`).
+- `.nutri-nav` + `.nutri-nav-separator` (nuevas) — barra de navegacion
+ en la toolbar con separador vertical.
+- `.nutri-badge` — sin cambio de API, pero refactorizado a variantes
+ soft (fondo suave + border) coherentes con la nueva paleta semaforo.
+- `.nutri-status` — chip pill con dot indicator (::before) para el
+ status del batch, colores derivados del semaforo semaforo semantico.
+- `.nutri-alert` (nueva) — banner full-width con icono + titulo + body,
+ border-left de 3 px, variantes `good/warn/bad/info`. Reemplaza el hack
+ de "badge con display:block" del wizard.
+- `.nutri-kpi` (nueva) + `.nutri-kpi-grid` — card KPI con icono a la
+ izquierda (chip 44x44), label uppercase, valor 28 px negrita, hint.
+ Variantes `--brand`, `--accent`, `--warn`, `--good`, `--muted`.
+- `.nutri-table` + `.nutri-table-wrap` (nuevo wrap) — tablas con
+ headers navy-500 (uppercase 12 px), banded rows (`--nutri-gray-25`),
+ hover state (`--nutri-navy-50`), radios en las esquinas y borde
+ exterior via el wrap.
+- `.nutri-empty` (nueva) + `.nutri-loading` (nueva) — patrones de
+ estado consistentes con icono + titulo + body.
+- `.nutri-actions` (nueva) — grupo de botones con variantes `--end`,
+ `--between` y `.nutri-actions-divider` para hacer flex-grow.
+
+### Componentes rediseñados
+
+- **`app.html` / `app.scss`** — Toolbar con logo blanco anclado
+ correctamente, brand con titulo + subtitulo en dos lineas, nav con
+ separador vertical y estado activo claro.
+- **`dashboard.component.*`** — Header con eyebrow, 4 KPI cards
+ (`brand`/`muted`/`warn`/`good`) con iconos Material distintivos,
+ empty state con CTA para crear el primer batch, tabla con
+ `nutri-table-wrap` (radius uniforme, hover row).
+- **`batch-wizard.component.*`** — Wizard con `.wizard-step` que
+ estructura cada paso en head (titulo + descripcion) / body (inputs) /
+ footer (botones). Stepper con header sobre fondo gray-50 y borde
+ inferior. Alerts full-width para colisiones (bad), saltos de dia
+ (info), flash cargado (good), advertencias del preview (warn). Tabla
+ de pre_cortes con wrap y accion delete inline.
+- **`batch-detail.component.*`** — Header con status chip inline en la
+ meta, tabla de pre_cortes con wrap, alert info al pie explicando
+ inmutabilidad. `<code>` con estilo monospace + fondo gray-100.
+- **`downloads.component.*`** — Consolidado destacado con card
+ `--featured` (banda naranja lateral), file rows con icono chip
+ coloreado + nombre + meta, tabla compacta para dailies, seccion ZIP
+ al final. Empty states elegantes.
+
+### Cambios menores
+
+- Se anadio `MatTooltipModule` al wizard (para tooltip del boton
+ delete inline).
+- Se removio el uso del atributo `iconPositionEnd` en `<mat-icon>`
+ dentro de botones (no existe en la version instalada de Material).
+- Removidos todos los `style="..."` inline salvo un puñado justificado
+ en tablas (ancho fijo de columnas de accion).
+
+### Verificacion visual (checklist para el usuario)
+
+- **Toolbar**: logo NutriAvicola en chip blanco con nitidez, titulo
+ "NutriAvicola BI" + subtitulo, botones nav con separador vertical.
+- **Dashboard**: 4 KPI cards con iconos y jerarquia visual clara. Tabla
+ con headers navy pequeños uppercase; hover cambia el row a navy-50.
+- **Wizard**: cada paso tiene head + body + footer definidos. Alerts
+ con iconografia Material (warning_amber, error_outline, task_alt,
+ check_circle, info). Botones "Continuar" en flat primary; "Atras"
+ en text mat-button.
+- **Downloads**: consolidado en card con banda naranja lateral y CTA
+ primary grande. Dailies en tabla compacta. ZIP en card final.
+- **Detail**: status chip pill con dot indicator, tabla con hover, alert
+ info al pie con `<code>` estilizado.
+
+### Build de produccion
+
+`npm run build` produce:
+- `main-*.js` — 390 KB raw / 98 KB gzip (dentro del budget de 600 KB
+ initial warning).
+- `styles-*.css` — 24 KB raw / 4.1 KB gzip.
+- Lazy chunks: wizard 44 KB gzip, dashboard 2 KB gzip, downloads
+ 2.5 KB gzip, detail 2 KB gzip.
+
+Ningun budget `anyComponentStyle` excedido (los component .scss suman
+< 2 KB cada uno; el grueso vive en el `styles.scss` global).
+
+### Rollback
+
+Si algo se ve mal en produccion, revertir el commit del rediseño
+(`git revert <sha>`) restaura Fase 7C.1 sin tocar Fase 7D/7E, ya que
+todo el cambio vive en `frontend/`.
 
 ---
 

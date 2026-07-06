@@ -1,89 +1,156 @@
 <div class="nutri-page nutri-stack">
-  <div>
-    <h1 class="nutri-section-title" style="margin: 0;">Descargas del batch</h1>
-    <p class="nutri-muted" style="margin: 4px 0 0;">
-      El equipo de BI usa el <strong>consolidado</strong> para armar
-      dashboards; los dailies son de referencia por dia; el ZIP contiene
-      todo empaquetado.
-    </p>
-  </div>
+  <header class="nutri-page-header">
+    <div>
+      <p class="nutri-eyebrow">Reportes generados</p>
+      <h1 class="nutri-page-header__title">Descargas del batch</h1>
+      <p class="nutri-page-header__subtitle">
+        El equipo de BI usa el <strong>consolidado</strong> mensual como fuente
+        para los dashboards de Power BI. Los dailies son de referencia por dia
+        y el ZIP empaqueta todo junto.
+      </p>
+    </div>
+    <div class="nutri-page-header__actions">
+      <a mat-stroked-button routerLink="/">
+        <mat-icon>arrow_back</mat-icon>
+        Dashboard
+      </a>
+    </div>
+  </header>
 
   @if (loading()) {
-    <mat-spinner></mat-spinner>
+    <div class="nutri-loading">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Cargando archivos generados...</span>
+    </div>
   } @else if (error()) {
-    <div class="nutri-card">Error: {{ error() }}</div>
+    <div class="nutri-alert bad" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <div class="nutri-alert__body">
+        <p class="nutri-alert__title">No se pudo cargar el listado de descargas</p>
+        <p>{{ error() }}</p>
+      </div>
+    </div>
   } @else if (data(); as d) {
 
-    <div class="nutri-card">
-      <h2 class="nutri-section-title">Consolidado mensual</h2>
+    <!-- Consolidado destacado -->
+    <section class="nutri-card nutri-card--featured downloads-featured">
+      <div class="downloads-featured__head">
+        <p class="nutri-eyebrow">Recomendado para BI</p>
+        <h2 class="downloads-featured__title">Consolidado mensual</h2>
+        <p class="nutri-muted">
+          Un solo archivo con la vista completa del mes: portada, resumen,
+          por categoria, detalle por material y semanas ISO.
+        </p>
+      </div>
+
       @if (filterKind('consolidado').length === 0) {
-        <p class="nutri-muted">No hay consolidado.</p>
+        <div class="nutri-empty">
+          <div class="nutri-empty__icon"><mat-icon>description</mat-icon></div>
+          <p class="nutri-empty__title">Aun no hay consolidado</p>
+          <p class="nutri-empty__body">Genera el batch para obtener el archivo consolidado.</p>
+        </div>
       }
       @for (i of filterKind('consolidado'); track i.filename) {
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0;">
-          <div>
-            <mat-icon style="vertical-align: middle; color: var(--nutri-navy);">description</mat-icon>
-            <strong style="margin-left: 6px;">{{ i.filename }}</strong>
-            <span class="nutri-muted" style="margin-left: 10px;">{{ humanSize(i.size_bytes) }}</span>
+        <div class="downloads-file-row downloads-file-row--featured">
+          <div class="downloads-file-row__info">
+            <span class="downloads-file-row__icon downloads-file-row__icon--brand">
+              <mat-icon>description</mat-icon>
+            </span>
+            <div>
+              <div class="downloads-file-row__name">{{ i.filename }}</div>
+              <div class="downloads-file-row__meta">
+                Excel &middot; {{ humanSize(i.size_bytes) }}
+              </div>
+            </div>
           </div>
           <a mat-flat-button color="primary" [href]="href(i)" download>
             <mat-icon>download</mat-icon>
-            Descargar
+            Descargar consolidado
           </a>
         </div>
       }
-    </div>
+    </section>
 
-    <div class="nutri-card">
-      <h2 class="nutri-section-title">Reportes diarios</h2>
+    <!-- Dailies -->
+    <section class="nutri-card">
+      <div class="nutri-card-header">
+        <div>
+          <h2 class="nutri-section-title" style="margin: 0;">Reportes diarios</h2>
+          <p class="nutri-muted" style="margin: 4px 0 0;">
+            Un archivo por dia habil con datos.
+          </p>
+        </div>
+        <span class="nutri-badge muted">{{ filterKind('daily').length }} archivos</span>
+      </div>
+
       @if (filterKind('daily').length === 0) {
-        <p class="nutri-muted">No hay dailies.</p>
+        <div class="nutri-empty">
+          <div class="nutri-empty__icon"><mat-icon>calendar_today</mat-icon></div>
+          <p class="nutri-empty__title">No hay dailies</p>
+          <p class="nutri-empty__body">Los archivos por dia apareceran aca despues de generar.</p>
+        </div>
       } @else {
-        <table class="nutri-table">
-          <thead>
-            <tr>
-              <th>Archivo</th>
-              <th class="num">Tamano</th>
-              <th style="width: 130px;">Accion</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (i of filterKind('daily'); track i.filename) {
+        <div class="nutri-table-wrap">
+          <table class="nutri-table">
+            <thead>
               <tr>
-                <td>{{ i.filename }}</td>
-                <td class="num">{{ humanSize(i.size_bytes) }}</td>
-                <td>
-                  <a mat-stroked-button color="primary" [href]="href(i)" download>
-                    <mat-icon>download</mat-icon>
-                    Descargar
-                  </a>
-                </td>
+                <th>Archivo</th>
+                <th class="num">Tamano</th>
+                <th style="width: 150px;">Accion</th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (i of filterKind('daily'); track i.filename) {
+                <tr>
+                  <td>
+                    <span class="downloads-inline-icon"><mat-icon>calendar_today</mat-icon></span>
+                    {{ i.filename }}
+                  </td>
+                  <td class="num nutri-muted">{{ humanSize(i.size_bytes) }}</td>
+                  <td>
+                    <a mat-stroked-button color="primary" [href]="href(i)" download>
+                      <mat-icon>download</mat-icon>
+                      Descargar
+                    </a>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       }
-    </div>
+    </section>
 
-    <div class="nutri-card">
-      <h2 class="nutri-section-title">Descarga masiva</h2>
+    <!-- ZIP masivo -->
+    <section class="nutri-card">
+      <div class="nutri-card-header">
+        <div>
+          <h2 class="nutri-section-title" style="margin: 0;">Todo empaquetado</h2>
+          <p class="nutri-muted" style="margin: 4px 0 0;">
+            Descarga masiva del batch en un solo ZIP.
+          </p>
+        </div>
+      </div>
+
       @for (i of filterKind('zip'); track i.filename) {
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0;">
-          <div>
-            <mat-icon style="vertical-align: middle; color: var(--nutri-orange);">folder_zip</mat-icon>
-            <strong style="margin-left: 6px;">{{ i.filename }}</strong>
-            <span class="nutri-muted" style="margin-left: 10px;">{{ humanSize(i.size_bytes) }}</span>
+        <div class="downloads-file-row">
+          <div class="downloads-file-row__info">
+            <span class="downloads-file-row__icon downloads-file-row__icon--accent">
+              <mat-icon>folder_zip</mat-icon>
+            </span>
+            <div>
+              <div class="downloads-file-row__name">{{ i.filename }}</div>
+              <div class="downloads-file-row__meta">
+                ZIP &middot; {{ humanSize(i.size_bytes) }}
+              </div>
+            </div>
           </div>
-          <a mat-flat-button color="accent" [href]="href(i)" download>
+          <a mat-stroked-button color="primary" [href]="href(i)" download>
             <mat-icon>download</mat-icon>
-            Descargar todo (.zip)
+            Descargar ZIP
           </a>
         </div>
       }
-    </div>
-
-    <div style="text-align: center;">
-      <a mat-button routerLink="/">Volver al dashboard</a>
-    </div>
+    </section>
   }
 </div>

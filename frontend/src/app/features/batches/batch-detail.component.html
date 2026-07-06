@@ -1,21 +1,36 @@
 <div class="nutri-page nutri-stack">
   @if (loading()) {
-    <mat-spinner></mat-spinner>
+    <div class="nutri-loading">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Cargando batch...</span>
+    </div>
   } @else if (error()) {
-    <div class="nutri-card">Error: {{ error() }}</div>
-  } @else if (batch(); as b) {
-    <div style="display: flex; align-items: center; justify-content: space-between;">
-      <div>
-        <h1 class="nutri-section-title" style="margin: 0;">{{ b.nombre || '(sin nombre)' }}</h1>
-        <p class="nutri-muted" style="margin: 4px 0 0;">
-          <span class="nutri-status" [class]="b.status">{{ b.status }}</span>
-          &middot; {{ b.num_pre_cortes }} pre_corte(s) &middot;
-          @if (b.flash) {
-            flash {{ b.flash.periodo_year }}-{{ b.flash.periodo_month }}
-          } @else { sin flash }
-        </p>
+    <div class="nutri-alert bad" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <div class="nutri-alert__body">
+        <p class="nutri-alert__title">No se pudo cargar el batch</p>
+        <p>{{ error() }}</p>
       </div>
-      <div style="display: flex; gap: 8px;">
+    </div>
+  } @else if (batch(); as b) {
+
+    <header class="nutri-page-header">
+      <div>
+        <p class="nutri-eyebrow">Batch</p>
+        <h1 class="nutri-page-header__title">{{ b.nombre || '(sin nombre)' }}</h1>
+        <div class="detail-meta">
+          <span class="nutri-status" [class]="b.status">{{ b.status }}</span>
+          <span class="nutri-muted">{{ b.num_pre_cortes }} pre_corte(s)</span>
+          @if (b.flash) {
+            <span class="nutri-muted">
+              &middot; flash {{ b.flash.periodo_year }}-{{ b.flash.periodo_month | number:'2.0-0' }}
+            </span>
+          } @else {
+            <span class="nutri-muted">&middot; sin flash</span>
+          }
+        </div>
+      </div>
+      <div class="nutri-page-header__actions">
         @if (b.status === 'matched') {
           <a mat-flat-button color="primary" [routerLink]="['/batches', b.id, 'descargas']">
             <mat-icon>download</mat-icon>
@@ -27,42 +42,58 @@
           Archivar
         </button>
       </div>
-    </div>
+    </header>
 
-    <div class="nutri-card">
-      <h2 class="nutri-section-title">Pre cortes ({{ b.pre_cortes.length }})</h2>
+    <section class="nutri-card">
+      <div class="nutri-card-header">
+        <h2 class="nutri-section-title" style="margin: 0;">
+          Pre cortes ({{ b.pre_cortes.length }})
+        </h2>
+      </div>
+
       @if (b.pre_cortes.length === 0) {
-        <p class="nutri-muted">No hay pre_cortes en este batch todavia.</p>
+        <div class="nutri-empty">
+          <div class="nutri-empty__icon"><mat-icon>inbox</mat-icon></div>
+          <p class="nutri-empty__title">Sin pre_cortes</p>
+          <p class="nutri-empty__body">Este batch no tiene archivos PRE CORTE cargados aun.</p>
+        </div>
       } @else {
-        <table class="nutri-table">
-          <thead>
-            <tr>
-              <th>Archivo</th>
-              <th>Fecha archivo</th>
-              <th>Fecha produccion resuelta</th>
-              <th class="num">Filas</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (pc of b.pre_cortes; track pc.carga_id) {
+        <div class="nutri-table-wrap">
+          <table class="nutri-table">
+            <thead>
               <tr>
-                <td>{{ pc.filename }}</td>
-                <td>{{ pc.fecha_archivo }}</td>
-                <td><strong>{{ pc.fecha_produccion }}</strong></td>
-                <td class="num">{{ pc.num_filas_original }}</td>
+                <th>Archivo</th>
+                <th>Fecha archivo</th>
+                <th>Fecha produccion resuelta</th>
+                <th class="num">Filas</th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (pc of b.pre_cortes; track pc.carga_id) {
+                <tr>
+                  <td>{{ pc.filename }}</td>
+                  <td class="nutri-muted">{{ pc.fecha_archivo }}</td>
+                  <td><strong>{{ pc.fecha_produccion }}</strong></td>
+                  <td class="num">{{ pc.num_filas_original }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       }
-    </div>
+    </section>
 
-    <div class="nutri-card">
-      <p class="nutri-muted">
-        Nota: este batch fue creado desde el wizard. Para editarlo, deberia
-        estar en <code>draft</code>. Batches en estado <code>ready_to_match</code>
-        o superior son inmutables — crea uno nuevo si necesitas cambios.
-      </p>
+    <div class="nutri-alert info">
+      <mat-icon>lock</mat-icon>
+      <div class="nutri-alert__body">
+        <p class="nutri-alert__title">Batch inmutable</p>
+        <p>
+          Este batch fue creado desde el wizard. Para editarlo, deberia estar
+          en <code>draft</code>. Los batches en estado
+          <code>ready_to_match</code> o superior son inmutables — crea uno
+          nuevo si necesitas cambios.
+        </p>
+      </div>
     </div>
   }
 </div>

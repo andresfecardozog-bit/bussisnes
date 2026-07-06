@@ -1,16 +1,24 @@
-// Fase 7C - Tema corporativo NutriAvicola
-// Paleta derivada del logo: navy (#0F2E4C) + naranja (#E87722).
-// Material 3 recibe paletas base y el resto lo cubrimos con CSS custom
-// properties propias (`--nutri-*`) para acentos, borders y KPI cards.
+// Fase 7C.2 - Tema corporativo NutriAvicola (rediseño 2026-07-06)
+//
+// Sistema de diseño con tokens explícitos: paleta ampliada en shades,
+// spacing scale, escala tipográfica, elevación, radios y motion. Todo
+// vive como CSS custom properties para poder cambiarse desde un solo
+// lugar. Los tokens legacy (`--nutri-navy`, `--nutri-orange`, etc.)
+// siguen expuestos como aliases del nuevo sistema para no romper nada.
+//
+// Filosofía visual: sobria, corporativa, B2B. Superficies sólidas
+// (nada de glass / backdrop-filter). Elevación sutil. Bordes 1px.
+// Radios pequeños (4-8px). Naranja como acento, jamás como fondo
+// dominante. El semáforo verde/amarillo/rojo se reserva para KPIs.
 
 @use '@angular/material' as mat;
 
 html {
   height: 100%;
 
-  // Paleta base Material 3. Se usa `azure` como primary (azules corporativos)
-  // y `orange` como tertiary (acentos). Los componentes core (buttons,
-  // toolbar, etc.) heredan estos colores.
+  // Paleta base Material 3. Se mantienen `azure` primary + `orange`
+  // tertiary; los tokens `--mat-sys-*` se sobreescriben abajo para
+  // apuntar al navy/naranja corporativo.
   @include mat.theme((
     color: (
       primary: mat.$azure-palette,
@@ -20,144 +28,738 @@ html {
     density: 0,
   ));
 
-  // CSS variables corporativas (override de Material sys tokens donde
-  // aplique + tokens custom para nuestros componentes).
-  --nutri-navy: #0F2E4C;
-  --nutri-navy-deep: #081A2C;
-  --nutri-orange: #E87722;
-  --nutri-orange-light: #FCE1C7;
-  --nutri-orange-deep: #B85F1A;
-  --nutri-grid: #8C8C8C;
-  --nutri-grid-soft: #E0E0E0;
-  --nutri-good: #63BE7B;
-  --nutri-warn: #FFEB84;
-  --nutri-bad: #F8696B;
-  --nutri-muted: #595959;
-  --nutri-surface: #FAFBFC;
+  // ---------------------------------------------------------------------------
+  // Paleta corporativa (shades)
+  // ---------------------------------------------------------------------------
+  --nutri-navy-50:  #E9EFF6;
+  --nutri-navy-100: #C8D6E4;
+  --nutri-navy-200: #94AFC7;
+  --nutri-navy-300: #5D82A8;
+  --nutri-navy-400: #2E5680;
+  --nutri-navy-500: #0F2E4C;
+  --nutri-navy-600: #0B2740;
+  --nutri-navy-700: #081A2C;
+  --nutri-navy-800: #051424;
+  --nutri-navy-900: #030D18;
 
-  // Sobreescribe tokens de sys para que el toolbar y botones primary usen
-  // el navy corporativo (sin depender del hash exacto del theme mixin).
-  --mat-sys-primary: var(--nutri-navy);
-  --mat-sys-on-primary: #FFFFFF;
-  --mat-sys-tertiary: var(--nutri-orange);
-  --mat-sys-on-tertiary: #FFFFFF;
+  --nutri-orange-50:  #FEF3E9;
+  --nutri-orange-100: #FDE0C4;
+  --nutri-orange-200: #FBC38B;
+  --nutri-orange-300: #F5A251;
+  --nutri-orange-400: #EF8A32;
+  --nutri-orange-500: #E87722;
+  --nutri-orange-600: #C7621B;
+  --nutri-orange-700: #A34D14;
+  --nutri-orange-800: #7D3B10;
+  --nutri-orange-900: #582808;
+
+  --nutri-gray-25:  #FCFCFD;
+  --nutri-gray-50:  #F8F9FA;
+  --nutri-gray-100: #F1F3F5;
+  --nutri-gray-200: #E4E7EB;
+  --nutri-gray-300: #CBD1D8;
+  --nutri-gray-400: #9BA3AF;
+  --nutri-gray-500: #6B7480;
+  --nutri-gray-600: #4B5563;
+  --nutri-gray-700: #333B47;
+  --nutri-gray-800: #1F252E;
+  --nutri-gray-900: #111319;
+
+  // Semáforo con variantes soft (fondo/borde) y solid (bloques KPI Excel)
+  --nutri-sem-good-solid: #63BE7B;
+  --nutri-sem-good-bg:    #E8F6EC;
+  --nutri-sem-good-fg:    #1B7A34;
+  --nutri-sem-good-border:#B7E4C1;
+
+  --nutri-sem-warn-solid: #FFEB84;
+  --nutri-sem-warn-bg:    #FFF7DC;
+  --nutri-sem-warn-fg:    #8A6100;
+  --nutri-sem-warn-border:#F3D97F;
+
+  --nutri-sem-bad-solid:  #F8696B;
+  --nutri-sem-bad-bg:     #FCEAEB;
+  --nutri-sem-bad-fg:     #B0242A;
+  --nutri-sem-bad-border: #F1B7B9;
+
+  --nutri-sem-info-solid: #5D82A8;
+  --nutri-sem-info-bg:    #E9EFF6;
+  --nutri-sem-info-fg:    #0F2E4C;
+  --nutri-sem-info-border:#B7C7DB;
+
+  // ---------------------------------------------------------------------------
+  // Aliases legacy — mantienen compatibilidad con estilos previos.
+  // ---------------------------------------------------------------------------
+  --nutri-navy:        var(--nutri-navy-500);
+  --nutri-navy-deep:   var(--nutri-navy-700);
+  --nutri-orange:      var(--nutri-orange-500);
+  --nutri-orange-light:var(--nutri-orange-100);
+  --nutri-orange-deep: var(--nutri-orange-700);
+  --nutri-grid:        var(--nutri-gray-300);
+  --nutri-grid-soft:   var(--nutri-gray-200);
+  --nutri-good:        var(--nutri-sem-good-solid);
+  --nutri-warn:        var(--nutri-sem-warn-solid);
+  --nutri-bad:         var(--nutri-sem-bad-solid);
+  --nutri-muted:       var(--nutri-gray-600);
+  --nutri-surface:     var(--nutri-gray-50);
+
+  // ---------------------------------------------------------------------------
+  // Superficies semánticas
+  // ---------------------------------------------------------------------------
+  --nutri-bg-app:        var(--nutri-gray-50);
+  --nutri-bg-surface:    #FFFFFF;
+  --nutri-bg-subtle:     var(--nutri-gray-50);
+  --nutri-bg-emphasis:   var(--nutri-navy-500);
+  --nutri-bg-emphasis-2: var(--nutri-navy-700);
+
+  --nutri-text-primary:   var(--nutri-gray-900);
+  --nutri-text-secondary: var(--nutri-gray-600);
+  --nutri-text-muted:     var(--nutri-gray-500);
+  --nutri-text-on-emphasis:#FFFFFF;
+  --nutri-text-brand:     var(--nutri-navy-500);
+
+  --nutri-border-default: var(--nutri-gray-200);
+  --nutri-border-strong:  var(--nutri-gray-300);
+  --nutri-border-brand:   var(--nutri-navy-300);
+  --nutri-border-accent:  var(--nutri-orange-500);
+
+  // ---------------------------------------------------------------------------
+  // Spacing (escala 4px)
+  // ---------------------------------------------------------------------------
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  // ---------------------------------------------------------------------------
+  // Typography scale
+  // ---------------------------------------------------------------------------
+  --fs-xs:   12px;
+  --fs-sm:   13px;
+  --fs-base: 14px;
+  --fs-md:   16px;
+  --fs-lg:   20px;
+  --fs-xl:   24px;
+  --fs-2xl:  28px;
+  --fs-3xl:  32px;
+
+  --lh-tight:  1.2;
+  --lh-snug:   1.35;
+  --lh-normal: 1.5;
+  --lh-loose:  1.7;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  --letter-spacing-wide: 0.4px;
+
+  // ---------------------------------------------------------------------------
+  // Radios (moderados; nada de burbuja pill fuera de badges/status)
+  // ---------------------------------------------------------------------------
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  // ---------------------------------------------------------------------------
+  // Elevación sutil (5 niveles). Sombra tintada al navy para cohesión.
+  // ---------------------------------------------------------------------------
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(15, 46, 76, 0.06);
+  --elev-2: 0 1px 3px rgba(15, 46, 76, 0.08),
+            0 1px 2px rgba(15, 46, 76, 0.04);
+  --elev-3: 0 4px 6px -1px rgba(15, 46, 76, 0.08),
+            0 2px 4px -1px rgba(15, 46, 76, 0.05);
+  --elev-4: 0 10px 15px -3px rgba(15, 46, 76, 0.10),
+            0 4px 6px -2px rgba(15, 46, 76, 0.05);
+  --elev-5: 0 20px 25px -5px rgba(15, 46, 76, 0.10),
+            0 10px 10px -5px rgba(15, 46, 76, 0.04);
+
+  // ---------------------------------------------------------------------------
+  // Motion tokens
+  // ---------------------------------------------------------------------------
+  --dur-fast:   100ms;
+  --dur-normal: 150ms;
+  --dur-slow:   250ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emph:     cubic-bezier(0.3, 0, 0, 1);
+
+  // ---------------------------------------------------------------------------
+  // Override de tokens Material sys para toolbar/botones primarios
+  // ---------------------------------------------------------------------------
+  --mat-sys-primary:      var(--nutri-navy-500);
+  --mat-sys-on-primary:   #FFFFFF;
+  --mat-sys-tertiary:     var(--nutri-orange-500);
+  --mat-sys-on-tertiary:  #FFFFFF;
 }
 
+// -----------------------------------------------------------------------------
+// Base
+// -----------------------------------------------------------------------------
 body {
   color-scheme: light;
-  background-color: var(--nutri-surface);
-  color: var(--mat-sys-on-surface);
+  background-color: var(--nutri-bg-app);
+  color: var(--nutri-text-primary);
   font: var(--mat-sys-body-medium);
   margin: 0;
   height: 100%;
   font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 // -----------------------------------------------------------------------------
-// Utilitarias corporativas (paginas, cards, secciones)
+// Layout: contenedor de página
 // -----------------------------------------------------------------------------
 .nutri-page {
-  padding: 24px;
+  padding: var(--space-8) var(--space-6);
   max-width: 1280px;
   margin: 0 auto;
 }
 
+.nutri-stack > * + * { margin-top: var(--space-6); }
+
+// Header estandar (título + subtítulo + acción a la derecha)
+.nutri-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+
+  &__title {
+    font-size: var(--fs-2xl);
+    line-height: var(--lh-tight);
+    font-weight: var(--fw-semibold);
+    color: var(--nutri-text-brand);
+    margin: 0;
+    letter-spacing: -0.2px;
+  }
+
+  &__subtitle {
+    margin: var(--space-2) 0 0;
+    font-size: var(--fs-base);
+    color: var(--nutri-text-secondary);
+    max-width: 640px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    margin-left: auto;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Tipografía utilitaria
+// -----------------------------------------------------------------------------
 .nutri-section-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--nutri-navy);
-  margin: 0 0 16px 0;
-  letter-spacing: 0.2px;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-semibold);
+  color: var(--nutri-text-brand);
+  margin: 0 0 var(--space-4) 0;
+  letter-spacing: 0.1px;
+}
+
+.nutri-eyebrow {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--nutri-text-muted);
 }
 
 .nutri-muted {
-  color: var(--nutri-muted);
-  font-size: 13px;
+  color: var(--nutri-text-secondary);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
 }
 
+// -----------------------------------------------------------------------------
+// Card corporativa: superficie sólida, borde 1px, sombra sutil, radius pequeño.
+// Sin blur, sin transparencias.
+// -----------------------------------------------------------------------------
 .nutri-card {
-  background: #FFFFFF;
-  border: 1px solid var(--nutri-grid-soft);
-  border-radius: 6px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(15, 46, 76, 0.06);
+  background: var(--nutri-bg-surface);
+  border: 1px solid var(--nutri-border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--elev-1);
+  transition: box-shadow var(--dur-normal) var(--ease-standard),
+              border-color var(--dur-normal) var(--ease-standard);
 }
 
+.nutri-card--flush { padding: 0; }
+.nutri-card--tight { padding: var(--space-4); }
+
+.nutri-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+
+  h2, h3 { margin: 0; }
+}
+
+// Card destacada (featured) — bandera lateral naranja para acción principal
+.nutri-card--featured {
+  border-color: var(--nutri-border-default);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--nutri-orange-500);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Toolbar: barra corporativa navy con contenedor blanco para el logo
+// -----------------------------------------------------------------------------
 .nutri-toolbar {
-  background: var(--nutri-navy) !important;
-  color: #FFFFFF !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  background: var(--nutri-bg-emphasis) !important;
+  color: var(--nutri-text-on-emphasis) !important;
+  box-shadow: var(--elev-2);
+  height: 64px !important;
+  padding: 0 var(--space-6) !important;
+  border-bottom: 1px solid var(--nutri-navy-700);
 }
 
-.nutri-logo-img {
-  height: 34px;
-  margin-right: 16px;
-  filter: brightness(1.05);
+.nutri-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: inherit;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  border-radius: var(--radius-md);
+  transition: background-color var(--dur-normal) var(--ease-standard);
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+  }
 }
 
+// El logo lleva "N" naranja + "NutriAvícola" en navy oscuro; sobre navy
+// el texto desaparecería. Se coloca dentro de un chip blanco redondeado
+// para garantizar contraste alto y legibilidad de la marca.
+.nutri-brand__logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  box-shadow: var(--elev-1);
+}
+
+.nutri-brand__logo-img {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+.nutri-brand__title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.nutri-brand__title-main {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.2px;
+  color: #FFFFFF;
+}
+
+.nutri-brand__title-sub {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--nutri-navy-100);
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+.nutri-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nutri-nav-separator {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 var(--space-3);
+}
+
+// -----------------------------------------------------------------------------
+// Badges — pill inline para etiquetar (estado ZIP, procesados, etc.).
+// Para alertas full-width usar `.nutri-alert`.
+// -----------------------------------------------------------------------------
 .nutri-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: var(--letter-spacing-wide);
+  line-height: 1.4;
+  border: 1px solid transparent;
 
-  &.good  { background: var(--nutri-good); color: #FFFFFF; }
-  &.warn  { background: var(--nutri-warn); color: #5C4700; }
-  &.bad   { background: var(--nutri-bad); color: #FFFFFF; }
-  &.info  { background: #DDEBF7; color: var(--nutri-navy); }
-  &.muted { background: #EEE; color: var(--nutri-muted); }
+  &.good  { background: var(--nutri-sem-good-bg);  color: var(--nutri-sem-good-fg);  border-color: var(--nutri-sem-good-border); }
+  &.warn  { background: var(--nutri-sem-warn-bg);  color: var(--nutri-sem-warn-fg);  border-color: var(--nutri-sem-warn-border); }
+  &.bad   { background: var(--nutri-sem-bad-bg);   color: var(--nutri-sem-bad-fg);   border-color: var(--nutri-sem-bad-border); }
+  &.info  { background: var(--nutri-sem-info-bg);  color: var(--nutri-sem-info-fg);  border-color: var(--nutri-sem-info-border); }
+  &.muted { background: var(--nutri-gray-100);     color: var(--nutri-gray-700);     border-color: var(--nutri-gray-200); }
 }
 
+// -----------------------------------------------------------------------------
+// Status chip para el estado del batch en tablas/detail
+// -----------------------------------------------------------------------------
 .nutri-status {
-  font-size: 12px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
   padding: 3px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-pill);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--letter-spacing-wide);
+  border: 1px solid transparent;
+  line-height: 1.5;
 
-  &.draft           { background: #E0E0E0; color: #333; }
-  &.ready_to_match  { background: #FFF3CD; color: #856404; }
-  &.matching        { background: #D1ECF1; color: #0C5460; }
-  &.matched         { background: var(--nutri-good); color: #FFF; }
-  &.failed          { background: var(--nutri-bad); color: #FFF; }
-  &.archived        { background: #E9ECEF; color: #6C757D; }
+  &::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.9;
+  }
+
+  &.draft           { background: var(--nutri-gray-100); color: var(--nutri-gray-700); border-color: var(--nutri-gray-200); }
+  &.ready_to_match  { background: var(--nutri-sem-warn-bg); color: var(--nutri-sem-warn-fg); border-color: var(--nutri-sem-warn-border); }
+  &.matching        { background: var(--nutri-sem-info-bg); color: var(--nutri-sem-info-fg); border-color: var(--nutri-sem-info-border); }
+  &.matched         { background: var(--nutri-sem-good-bg); color: var(--nutri-sem-good-fg); border-color: var(--nutri-sem-good-border); }
+  &.failed          { background: var(--nutri-sem-bad-bg); color: var(--nutri-sem-bad-fg); border-color: var(--nutri-sem-bad-border); }
+  &.archived        { background: var(--nutri-gray-100); color: var(--nutri-gray-500); border-color: var(--nutri-gray-200); }
 }
 
-// Tabla estandar (usar dentro de .nutri-card)
+// -----------------------------------------------------------------------------
+// Alert full-width — reemplaza el hack de "badge display:block"
+// -----------------------------------------------------------------------------
+.nutri-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  border-left-width: 3px;
+  font-size: var(--fs-base);
+  line-height: var(--lh-normal);
+
+  mat-icon {
+    flex: 0 0 auto;
+    margin-top: 1px;
+  }
+
+  &__body { flex: 1 1 auto; min-width: 0; }
+  &__title { font-weight: var(--fw-semibold); margin: 0 0 var(--space-1); }
+  &__body ul { margin: var(--space-2) 0 0; padding-left: var(--space-5); }
+  &__body li + li { margin-top: 2px; }
+
+  &.good {
+    background: var(--nutri-sem-good-bg);
+    color: var(--nutri-sem-good-fg);
+    border-color: var(--nutri-sem-good-border);
+    border-left-color: var(--nutri-sem-good-solid);
+  }
+  &.warn {
+    background: var(--nutri-sem-warn-bg);
+    color: var(--nutri-sem-warn-fg);
+    border-color: var(--nutri-sem-warn-border);
+    border-left-color: var(--nutri-orange-500);
+  }
+  &.bad {
+    background: var(--nutri-sem-bad-bg);
+    color: var(--nutri-sem-bad-fg);
+    border-color: var(--nutri-sem-bad-border);
+    border-left-color: var(--nutri-sem-bad-solid);
+  }
+  &.info {
+    background: var(--nutri-sem-info-bg);
+    color: var(--nutri-sem-info-fg);
+    border-color: var(--nutri-sem-info-border);
+    border-left-color: var(--nutri-navy-500);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// KPI card
+// -----------------------------------------------------------------------------
+.nutri-kpi {
+  background: var(--nutri-bg-surface);
+  border: 1px solid var(--nutri-border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  min-height: 96px;
+  transition: box-shadow var(--dur-normal) var(--ease-standard),
+              transform var(--dur-normal) var(--ease-standard);
+
+  &:hover { box-shadow: var(--elev-2); }
+
+  &__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--nutri-gray-100);
+    color: var(--nutri-gray-600);
+
+    mat-icon {
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
+    }
+  }
+
+  &__body { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+
+  &__label {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--nutri-text-muted);
+  }
+
+  &__value {
+    font-size: var(--fs-2xl);
+    line-height: var(--lh-tight);
+    font-weight: var(--fw-bold);
+    color: var(--nutri-text-brand);
+    margin-top: var(--space-1);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__hint {
+    font-size: var(--fs-xs);
+    color: var(--nutri-text-muted);
+    margin-top: var(--space-1);
+  }
+
+  // Variantes de tono para el ícono
+  &--brand   &__icon { background: var(--nutri-navy-50);   color: var(--nutri-navy-500); }
+  &--accent  &__icon { background: var(--nutri-orange-50); color: var(--nutri-orange-600); }
+  &--warn    &__icon { background: var(--nutri-sem-warn-bg); color: var(--nutri-sem-warn-fg); }
+  &--good    &__icon { background: var(--nutri-sem-good-bg); color: var(--nutri-sem-good-fg); }
+  &--muted   &__icon { background: var(--nutri-gray-100);  color: var(--nutri-gray-500); }
+}
+
+.nutri-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+// -----------------------------------------------------------------------------
+// Tabla corporativa
+// -----------------------------------------------------------------------------
 .nutri-table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-base);
+  color: var(--nutri-text-primary);
 
-  th {
-    background: var(--nutri-navy);
-    color: #FFF;
+  thead th {
+    background: var(--nutri-navy-500);
+    color: #FFFFFF;
     text-align: left;
-    padding: 10px 12px;
-    font-weight: 600;
-    border: 1px solid var(--nutri-navy-deep);
+    padding: var(--space-3) var(--space-4);
+    font-weight: var(--fw-semibold);
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid var(--nutri-navy-700);
+    white-space: nowrap;
+
+    &:first-child { border-top-left-radius: var(--radius-md); }
+    &:last-child  { border-top-right-radius: var(--radius-md); }
+    &.num { text-align: right; }
   }
-  td {
-    padding: 10px 12px;
-    border: 1px solid var(--nutri-grid);
-    color: var(--nutri-navy-deep);
+
+  tbody td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--nutri-border-default);
+    color: var(--nutri-text-primary);
+    background: var(--nutri-bg-surface);
+    vertical-align: middle;
   }
-  tr:nth-child(even) td { background: #F7F9FC; }
+
+  tbody tr:nth-child(even) td { background: var(--nutri-gray-25); }
+  tbody tr:hover td { background: var(--nutri-navy-50); }
+  tbody tr:last-child td {
+    border-bottom: none;
+    &:first-child { border-bottom-left-radius: var(--radius-md); }
+    &:last-child  { border-bottom-right-radius: var(--radius-md); }
+  }
+
   tr.total td {
-    background: var(--nutri-orange-light);
-    font-weight: 700;
-    border-top: 2px solid var(--nutri-orange-deep);
+    background: var(--nutri-orange-50) !important;
+    font-weight: var(--fw-bold);
+    border-top: 2px solid var(--nutri-orange-500);
+    color: var(--nutri-navy-700);
   }
+
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td.pct { text-align: right; font-weight: 600; }
-  td.pct.good { color: #006100; }
-  td.pct.warn { color: #9C5700; }
-  td.pct.bad  { color: #9C0006; }
+  td.pct { text-align: right; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
+  td.pct.good { color: var(--nutri-sem-good-fg); }
+  td.pct.warn { color: var(--nutri-sem-warn-fg); }
+  td.pct.bad  { color: var(--nutri-sem-bad-fg); }
 }
 
-// Espaciado uniforme entre bloques
-.nutri-stack > * + * { margin-top: 20px; }
+// Contenedor scrollable de tabla con borde para que herede el radio del card
+.nutri-table-wrap {
+  border: 1px solid var(--nutri-border-default);
+  border-radius: var(--radius-md);
+  overflow: auto;
+  background: var(--nutri-bg-surface);
+
+  .nutri-table thead th:first-child,
+  .nutri-table thead th:last-child { border-top-left-radius: 0; border-top-right-radius: 0; }
+  .nutri-table tbody tr:last-child td { border-bottom: none; }
+}
+
+// -----------------------------------------------------------------------------
+// Empty state, loading, error patterns
+// -----------------------------------------------------------------------------
+.nutri-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  gap: var(--space-3);
+  color: var(--nutri-text-secondary);
+
+  &__icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-lg);
+    background: var(--nutri-gray-100);
+    color: var(--nutri-gray-500);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    mat-icon { font-size: 30px; width: 30px; height: 30px; }
+  }
+
+  &__title {
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
+    color: var(--nutri-text-brand);
+    margin: 0;
+  }
+
+  &__body {
+    font-size: var(--fs-sm);
+    color: var(--nutri-text-secondary);
+    max-width: 420px;
+    margin: 0;
+  }
+}
+
+.nutri-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  color: var(--nutri-text-secondary);
+  font-size: var(--fs-sm);
+}
+
+// -----------------------------------------------------------------------------
+// Actions bar (grupo de botones al pie de un paso/card)
+// -----------------------------------------------------------------------------
+.nutri-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+
+  &--end { justify-content: flex-end; }
+  &--between { justify-content: space-between; }
+}
+
+.nutri-actions-divider { flex: 1 1 auto; }
+
+// -----------------------------------------------------------------------------
+// Overrides Material puntuales (mismos que necesita cualquier tema)
+// -----------------------------------------------------------------------------
+mat-toolbar a[mat-button] {
+  color: #FFFFFF !important;
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.2px;
+
+  &:hover { background-color: rgba(255, 255, 255, 0.08); }
+  &.active {
+    background-color: rgba(255, 255, 255, 0.14);
+    color: #FFFFFF !important;
+  }
+}
+
+// El stepper por defecto trae un fondo blanco propio; alineamos con card.
+.mat-stepper-horizontal, .mat-stepper-vertical {
+  background: transparent !important;
+  font-family: inherit;
+}
+
+.mat-step-header .mat-step-icon-selected,
+.mat-step-header .mat-step-icon-state-edit {
+  background-color: var(--nutri-navy-500) !important;
+  color: #FFFFFF !important;
+}
+
+.mat-step-header:hover:not([aria-disabled]),
+.mat-step-header[aria-selected="true"] {
+  background-color: var(--nutri-navy-50);
+  border-radius: var(--radius-md);
+}
+
+// Snackbar tono default alineado al brand
+.mat-mdc-snack-bar-container.mdc-snackbar {
+  --mdc-snackbar-container-color: var(--nutri-navy-700);
+  --mdc-snackbar-supporting-text-color: #FFFFFF;
+}

@@ -1,105 +1,138 @@
 <div class="nutri-page nutri-stack">
-  <div style="display: flex; align-items: center; justify-content: space-between;">
+  <header class="nutri-page-header">
     <div>
-      <h1 class="nutri-section-title" style="margin: 0;">Dashboard</h1>
-      <p class="nutri-muted" style="margin: 4px 0 0;">
-        Batches recientes y estado de generacion.
+      <p class="nutri-eyebrow">Panel operativo</p>
+      <h1 class="nutri-page-header__title">Dashboard</h1>
+      <p class="nutri-page-header__subtitle">
+        Batches recientes y estado de generacion de reportes de cumplimiento.
       </p>
     </div>
-    <a mat-flat-button color="primary" routerLink="/batches/nuevo">
-      <mat-icon>add</mat-icon>
-      Nuevo batch
-    </a>
-  </div>
+    <div class="nutri-page-header__actions">
+      <button mat-stroked-button type="button" (click)="reload()" matTooltip="Recargar">
+        <mat-icon>refresh</mat-icon>
+        Recargar
+      </button>
+      <a mat-flat-button color="primary" routerLink="/batches/nuevo">
+        <mat-icon>add</mat-icon>
+        Nuevo batch
+      </a>
+    </div>
+  </header>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
-    <div class="nutri-card">
-      <div class="nutri-muted">Total batches</div>
-      <div style="font-size: 28px; font-weight: 700; color: var(--nutri-navy);">
-        {{ batches().length }}
+  <section class="nutri-kpi-grid" aria-label="Indicadores globales">
+    <div class="nutri-kpi nutri-kpi--brand">
+      <div class="nutri-kpi__icon"><mat-icon>inventory_2</mat-icon></div>
+      <div class="nutri-kpi__body">
+        <span class="nutri-kpi__label">Total batches</span>
+        <span class="nutri-kpi__value">{{ batches().length }}</span>
+        <span class="nutri-kpi__hint">Historico registrado</span>
       </div>
     </div>
-    <div class="nutri-card">
-      <div class="nutri-muted">En draft</div>
-      <div style="font-size: 28px; font-weight: 700; color: var(--nutri-muted);">
-        {{ countByStatus('draft') }}
+    <div class="nutri-kpi nutri-kpi--muted">
+      <div class="nutri-kpi__icon"><mat-icon>edit_note</mat-icon></div>
+      <div class="nutri-kpi__body">
+        <span class="nutri-kpi__label">En draft</span>
+        <span class="nutri-kpi__value">{{ countByStatus('draft') }}</span>
+        <span class="nutri-kpi__hint">Aun editables</span>
       </div>
     </div>
-    <div class="nutri-card">
-      <div class="nutri-muted">Listos para match</div>
-      <div style="font-size: 28px; font-weight: 700; color: #856404;">
-        {{ countByStatus('ready_to_match') }}
+    <div class="nutri-kpi nutri-kpi--warn">
+      <div class="nutri-kpi__icon"><mat-icon>hourglass_top</mat-icon></div>
+      <div class="nutri-kpi__body">
+        <span class="nutri-kpi__label">Listos para match</span>
+        <span class="nutri-kpi__value">{{ countByStatus('ready_to_match') }}</span>
+        <span class="nutri-kpi__hint">Pendientes de generar</span>
       </div>
     </div>
-    <div class="nutri-card">
-      <div class="nutri-muted">Completados</div>
-      <div style="font-size: 28px; font-weight: 700; color: #006100;">
-        {{ countByStatus('matched') }}
+    <div class="nutri-kpi nutri-kpi--good">
+      <div class="nutri-kpi__icon"><mat-icon>check_circle</mat-icon></div>
+      <div class="nutri-kpi__body">
+        <span class="nutri-kpi__label">Completados</span>
+        <span class="nutri-kpi__value">{{ countByStatus('matched') }}</span>
+        <span class="nutri-kpi__hint">Reportes generados</span>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="nutri-card">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+  <section class="nutri-card">
+    <div class="nutri-card-header">
       <h2 class="nutri-section-title" style="margin: 0;">Batches recientes</h2>
-      <button mat-icon-button (click)="reload()" matTooltip="Recargar">
+      <button mat-icon-button (click)="reload()" matTooltip="Recargar" aria-label="Recargar tabla">
         <mat-icon>refresh</mat-icon>
       </button>
     </div>
 
     @if (loading()) {
-      <div style="display: flex; justify-content: center; padding: 24px;">
-        <mat-spinner diameter="32"></mat-spinner>
+      <div class="nutri-loading">
+        <mat-spinner diameter="36"></mat-spinner>
+        <span>Cargando batches...</span>
       </div>
     } @else if (error()) {
-      <p style="color: var(--nutri-bad);">Error: {{ error() }}</p>
+      <div class="nutri-alert bad" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <div class="nutri-alert__body">
+          <p class="nutri-alert__title">No se pudo cargar el listado</p>
+          <p>{{ error() }}</p>
+        </div>
+      </div>
     } @else if (batches().length === 0) {
-      <p class="nutri-muted" style="text-align: center; padding: 24px;">
-        No hay batches todavia. Crea uno con "Nuevo batch" arriba.
-      </p>
+      <div class="nutri-empty">
+        <div class="nutri-empty__icon"><mat-icon>folder_open</mat-icon></div>
+        <p class="nutri-empty__title">Aun no hay batches</p>
+        <p class="nutri-empty__body">
+          Crea tu primer batch mensual para cruzar los PRE CORTE contra el FLASH
+          y generar los reportes de cumplimiento.
+        </p>
+        <a mat-flat-button color="primary" routerLink="/batches/nuevo">
+          <mat-icon>add</mat-icon>
+          Crear primer batch
+        </a>
+      </div>
     } @else {
-      <table class="nutri-table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Status</th>
-            <th class="num">Pre cortes</th>
-            <th>Flash</th>
-            <th>Actualizado</th>
-            <th style="width: 120px;">Accion</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (b of batches(); track b.id) {
+      <div class="nutri-table-wrap">
+        <table class="nutri-table">
+          <thead>
             <tr>
-              <td>{{ b.nombre || '(sin nombre)' }}</td>
-              <td><span class="nutri-status" [class]="b.status">{{ b.status }}</span></td>
-              <td class="num">{{ b.num_pre_cortes }}</td>
-              <td>
-                @if (b.flash) {
-                  {{ b.flash.periodo_year }}-{{ b.flash.periodo_month }}
-                } @else {
-                  <span class="nutri-muted">—</span>
-                }
-              </td>
-              <td>{{ b.updated_at | slice: 0:19 }}</td>
-              <td>
-                @if (b.status === 'matched') {
-                  <a mat-stroked-button color="primary" [routerLink]="['/batches', b.id, 'descargas']">
-                    <mat-icon>download</mat-icon>
-                    Descargar
-                  </a>
-                } @else {
-                  <a mat-stroked-button [routerLink]="['/batches', b.id]">
-                    <mat-icon>edit</mat-icon>
-                    Abrir
-                  </a>
-                }
-              </td>
+              <th>Nombre</th>
+              <th>Status</th>
+              <th class="num">Pre cortes</th>
+              <th>Flash</th>
+              <th>Actualizado</th>
+              <th style="width: 140px;">Accion</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (b of batches(); track b.id) {
+              <tr>
+                <td><strong>{{ b.nombre || '(sin nombre)' }}</strong></td>
+                <td><span class="nutri-status" [class]="b.status">{{ b.status }}</span></td>
+                <td class="num">{{ b.num_pre_cortes }}</td>
+                <td>
+                  @if (b.flash) {
+                    {{ b.flash.periodo_year }}-{{ b.flash.periodo_month | number:'2.0-0' }}
+                  } @else {
+                    <span class="nutri-muted">—</span>
+                  }
+                </td>
+                <td class="nutri-muted">{{ b.updated_at | slice: 0:19 }}</td>
+                <td>
+                  @if (b.status === 'matched') {
+                    <a mat-stroked-button color="primary" [routerLink]="['/batches', b.id, 'descargas']">
+                      <mat-icon>download</mat-icon>
+                      Descargar
+                    </a>
+                  } @else {
+                    <a mat-stroked-button [routerLink]="['/batches', b.id]">
+                      <mat-icon>open_in_new</mat-icon>
+                      Abrir
+                    </a>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     }
-  </div>
+  </section>
 </div>

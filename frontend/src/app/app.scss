@@ -1,13 +1,12 @@
 :host {
   display: block;
   min-height: 100vh;
+  background: var(--nutri-bg-app);
 }
 
-.active {
-  background-color: rgba(255, 255, 255, 0.14);
-}
+.nutri-toolbar-spacer { flex: 1 1 auto; }
 
-mat-toolbar a[mat-button] {
-  color: #FFFFFF !important;
-  margin-left: 4px;
+.nutri-main {
+  display: block;
+  min-height: calc(100vh - 64px);
 }

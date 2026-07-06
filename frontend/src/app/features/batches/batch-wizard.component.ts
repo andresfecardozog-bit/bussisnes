@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatStepper, MatStepperModule } from '@angular/material/stepper';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { STEPPER_GLOBAL_OPTIONS, StepperSelectionEvent } from '@angular/cdk/stepper';
 import { BatchesService } from '../../core/batches.service';
 import {
@@ -25,6 +26,7 @@ import {
     CommonModule, ReactiveFormsModule, MatButtonModule, MatCardModule,
     MatFormFieldModule, MatIconModule, MatInputModule, MatProgressBarModule,
     MatProgressSpinnerModule, MatSelectModule, MatStepperModule,
+    MatTooltipModule,
   ],
   providers: [{ provide: STEPPER_GLOBAL_OPTIONS, useValue: { displayDefaultIndicatorType: false } }],
   templateUrl: './batch-wizard.component.html',

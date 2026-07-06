@@ -1,21 +1,29 @@
 <mat-toolbar class="nutri-toolbar">
-  <a routerLink="/" style="display: flex; align-items: center; text-decoration: none; color: inherit;">
-    <img src="/assets/logo.jpg" alt="NutriAvicola" class="nutri-logo-img" />
-    <span style="font-size: 16px; font-weight: 600; letter-spacing: 0.3px;">
-      Cumplimiento PRE CORTE vs FLASH
+  <a routerLink="/" class="nutri-brand" aria-label="NutriAvicola - Ir al dashboard">
+    <span class="nutri-brand__logo-wrap">
+      <img src="/assets/logo.jpg" alt="NutriAvicola" class="nutri-brand__logo-img" />
+    </span>
+    <span class="nutri-brand__title">
+      <span class="nutri-brand__title-main">NutriAvicola BI</span>
+      <span class="nutri-brand__title-sub">Cumplimiento PRE CORTE vs FLASH</span>
     </span>
   </a>
-  <span style="flex: 1 1 auto;"></span>
-  <a mat-button routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
-    <mat-icon>dashboard</mat-icon>
-    Dashboard
-  </a>
-  <a mat-button routerLink="/batches/nuevo" routerLinkActive="active">
-    <mat-icon>add</mat-icon>
-    Nuevo batch
-  </a>
+
+  <span class="nutri-toolbar-spacer"></span>
+
+  <nav class="nutri-nav" aria-label="Navegacion principal">
+    <a mat-button routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      <mat-icon>dashboard</mat-icon>
+      Dashboard
+    </a>
+    <span class="nutri-nav-separator" aria-hidden="true"></span>
+    <a mat-button routerLink="/batches/nuevo" routerLinkActive="active">
+      <mat-icon>add</mat-icon>
+      Nuevo batch
+    </a>
+  </nav>
 </mat-toolbar>
 
-<main>
+<main class="nutri-main">
   <router-outlet />
 </main>

@@ -1,1 +1,91 @@
 :host { display: block; }
+
+.downloads-featured {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+
+  &__head {
+    padding-left: var(--space-2);
+  }
+
+  &__title {
+    margin: var(--space-1) 0 var(--space-1);
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-semibold);
+    color: var(--nutri-text-brand);
+    line-height: var(--lh-tight);
+  }
+}
+
+.downloads-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--nutri-border-default);
+  border-radius: var(--radius-md);
+  background: var(--nutri-bg-surface);
+  transition: box-shadow var(--dur-normal) var(--ease-standard);
+  flex-wrap: wrap;
+
+  &:hover { box-shadow: var(--elev-2); }
+
+  &--featured {
+    background: var(--nutri-navy-50);
+    border-color: var(--nutri-navy-100);
+  }
+
+  &__info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: var(--nutri-gray-100);
+    color: var(--nutri-gray-600);
+
+    mat-icon { font-size: 22px; width: 22px; height: 22px; }
+
+    &--brand  { background: var(--nutri-navy-100);   color: var(--nutri-navy-600); }
+    &--accent { background: var(--nutri-orange-100); color: var(--nutri-orange-700); }
+  }
+
+  &__name {
+    font-weight: var(--fw-semibold);
+    color: var(--nutri-text-brand);
+    font-size: var(--fs-base);
+    word-break: break-all;
+  }
+
+  &__meta {
+    font-size: var(--fs-xs);
+    color: var(--nutri-text-secondary);
+    margin-top: 2px;
+  }
+}
+
+.downloads-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  color: var(--nutri-navy-400);
+  margin-right: 6px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
