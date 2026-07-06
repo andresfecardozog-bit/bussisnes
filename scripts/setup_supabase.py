@@ -45,7 +45,13 @@ def main() -> int:
     ]
 
     try:
-        existentes = {b["name"] for b in client.storage.list_buckets()}
+        buckets_raw = client.storage.list_buckets()
+        # supabase-py >=2 retorna objetos SyncBucket; <2 devolvia dicts.
+        existentes = set()
+        for b in buckets_raw:
+            name = getattr(b, "name", None) or (b.get("name") if isinstance(b, dict) else None)
+            if name:
+                existentes.add(name)
     except Exception as exc:
         print(f"ERROR listando buckets (probablemente la key es publishable): {exc}")
         return 3

@@ -50,6 +50,18 @@ app.add_middleware(
 )
 
 
+@app.get("/", tags=["meta"])
+def root() -> dict[str, str]:
+    """Landing JSON con links utiles. Evita 502 cuando alguien pega la URL raiz."""
+    return {
+        "service": "NutriAvicola - PRE CORTE vs FLASH API",
+        "version": __version__,
+        "docs": "/docs",
+        "health": "/health",
+        "openapi": "/openapi.json",
+    }
+
+
 @app.get("/health", response_model=HealthResponse, tags=["meta"])
 def health() -> HealthResponse:
     return HealthResponse(
