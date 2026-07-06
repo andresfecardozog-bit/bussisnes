@@ -7,7 +7,8 @@
   </div>
 
   <div class="nutri-card">
-    <mat-stepper #stepper linear labelPosition="bottom">
+    <mat-stepper #stepper linear labelPosition="bottom"
+                 (selectionChange)="onStepChange($event)">
 
       <!-- Paso 1: Nombrar batch -->
       <mat-step [stepControl]="step1" label="Nombrar">
@@ -156,12 +157,35 @@
 
       <!-- Paso 4: Preview -->
       <mat-step label="Preview">
-        @if (busy() && !preview()) {
-          <div style="text-align: center; padding: 24px;"><mat-spinner></mat-spinner></div>
-        } @else if (preview(); as p) {
-          @if (!p.flash_periodo_ok || p.flash_periodo_mensajes.length > 0) {
+        <h2 class="nutri-section-title" style="margin: 0 0 12px 0;">
+          Preview del batch
+        </h2>
+
+        @if (busy()) {
+          <div style="text-align: center; padding: 24px;">
+            <mat-spinner diameter="40"></mat-spinner>
+            <p class="nutri-muted" style="margin-top: 12px;">
+              Ejecutando match en memoria contra el FLASH...
+            </p>
+          </div>
+        }
+
+        @if (!busy() && !preview()) {
+          <div class="nutri-card" style="text-align: center; padding: 24px;">
+            <p class="nutri-muted" style="margin: 0 0 12px 0;">
+              Aun no se ha cargado el preview. Puedes disparar el calculo manualmente:
+            </p>
+            <button mat-flat-button color="primary" type="button" (click)="loadPreview()">
+              <mat-icon>refresh</mat-icon>
+              Cargar preview
+            </button>
+          </div>
+        }
+
+        @if (preview(); as p) {
+          @if (p.flash_periodo_mensajes.length > 0) {
             @for (m of p.flash_periodo_mensajes; track m) {
-              <p class="nutri-badge warn" style="display: block;">{{ m }}</p>
+              <p class="nutri-badge warn" style="display: block; margin-bottom: 8px;">{{ m }}</p>
             }
           }
 
@@ -187,41 +211,61 @@
             </div>
           }
 
-          <table class="nutri-table">
-            <thead>
-              <tr>
-                <th>Fecha produccion</th>
-                <th class="num">Materiales</th>
-                <th class="num">Plan</th>
-                <th class="num">Real</th>
-                <th class="num">Delta</th>
-                <th class="num">Cumplimiento</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (d of p.dias; track d.fecha_produccion) {
+          @if (p.dias.length === 0) {
+            <div class="nutri-card" style="padding: 16px;">
+              <p class="nutri-muted" style="margin: 0;">
+                No se pudo calcular ningun dia. Revisa que los pre_cortes y el
+                flash sean coherentes:
+              </p>
+              <ul style="margin: 8px 0 0 0; font-size: 13px;">
+                <li>El FLASH debe contener facturas del periodo declarado.</li>
+                <li>Al menos un pre_corte debe apuntar a un dia habil que aparezca en el FLASH.</li>
+                <li>Verifica los mensajes de arriba (warning) si los hay.</li>
+              </ul>
+            </div>
+          } @else {
+            <table class="nutri-table">
+              <thead>
                 <tr>
-                  <td><strong>{{ d.fecha_produccion }}</strong></td>
-                  <td class="num">{{ d.materiales_matched }}</td>
-                  <td class="num">{{ d.plan_total | number:'1.0-0' }}</td>
-                  <td class="num">{{ d.real_total | number:'1.0-0' }}</td>
-                  <td class="num">{{ d.delta_total | number:'1.0-0' }}</td>
-                  <td class="pct" [class]="cumplTier(d.cumplimiento_pct)">
-                    {{ (d.cumplimiento_pct * 100) | number:'1.2-2' }}%
-                  </td>
+                  <th>Fecha produccion</th>
+                  <th class="num">Materiales</th>
+                  <th class="num">Plan</th>
+                  <th class="num">Real</th>
+                  <th class="num">Delta</th>
+                  <th class="num">Cumplimiento</th>
                 </tr>
-              }
-            </tbody>
-          </table>
-
-          <div style="margin-top: 16px;">
-            <button mat-button matStepperPrevious type="button">Atras</button>
-            <button mat-flat-button color="primary" matStepperNext type="button"
-                    [disabled]="!p.listo_para_confirmar">
-              Estoy de acuerdo, continuar
-            </button>
-          </div>
+              </thead>
+              <tbody>
+                @for (d of p.dias; track d.fecha_produccion) {
+                  <tr>
+                    <td><strong>{{ d.fecha_produccion }}</strong></td>
+                    <td class="num">{{ d.materiales_matched }}</td>
+                    <td class="num">{{ d.plan_total | number:'1.0-0' }}</td>
+                    <td class="num">{{ d.real_total | number:'1.0-0' }}</td>
+                    <td class="num">{{ d.delta_total | number:'1.0-0' }}</td>
+                    <td class="pct" [class]="cumplTier(d.cumplimiento_pct)">
+                      {{ (d.cumplimiento_pct * 100) | number:'1.2-2' }}%
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
         }
+
+        <div style="margin-top: 16px;">
+          <button mat-button matStepperPrevious type="button">Atras</button>
+          <button mat-stroked-button type="button" (click)="loadPreview()"
+                  style="margin-left: 8px;">
+            <mat-icon>refresh</mat-icon>
+            Recargar preview
+          </button>
+          <button mat-flat-button color="primary" matStepperNext type="button"
+                  style="margin-left: 8px;"
+                  [disabled]="!preview()?.listo_para_confirmar">
+            Estoy de acuerdo, continuar
+          </button>
+        </div>
       </mat-step>
 
       <!-- Paso 5: Confirmar + generar -->

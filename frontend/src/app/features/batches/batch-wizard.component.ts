@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ViewChild, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, ViewChild, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,7 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatStepper, MatStepperModule } from '@angular/material/stepper';
-import { STEPPER_GLOBAL_OPTIONS } from '@angular/cdk/stepper';
+import { STEPPER_GLOBAL_OPTIONS, StepperSelectionEvent } from '@angular/cdk/stepper';
 import { BatchesService } from '../../core/batches.service';
 import {
   BatchDetailResponse, BatchSummary, PreviewResponse, ZipUploadResponse,
@@ -35,8 +35,22 @@ export class BatchWizardComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   @ViewChild(MatStepper) stepper!: MatStepper;
+
+  /**
+   * Handler del `(selectionChange)` del `<mat-stepper>`. Cuando el usuario
+   * navega al paso 4 (Preview, index 3), disparamos `loadPreview()` para
+   * que la tabla se renderice sin depender del boton "Continuar al preview"
+   * del paso anterior. Sin esto, saltar al paso 4 haciendo click en la
+   * label deja la pantalla en blanco.
+   */
+  onStepChange(event: StepperSelectionEvent): void {
+    if (event.selectedIndex === 3 && !this.preview() && !this.busy()) {
+      this.loadPreview();
+    }
+  }
 
   batch = signal<BatchDetailResponse | null>(null);
   preview = signal<PreviewResponse | null>(null);
@@ -135,9 +149,20 @@ export class BatchWizardComponent {
   loadPreview(): void {
     if (!this.batch()) return;
     this.busy.set(true);
+    this.preview.set(null); // limpiar preview previo para forzar rerender
     this.svc.preview(this.batch()!.id).subscribe({
-      next: (p) => { this.preview.set(p); this.busy.set(false); },
-      error: (e) => { this.busy.set(false); this.showError(e); },
+      next: (p) => {
+        this.preview.set(p);
+        this.busy.set(false);
+        // Blindaje para zoneless: forzar change detection por si el
+        // subscribe callback no la dispara en algun edge case.
+        this.cdr.markForCheck();
+      },
+      error: (e) => {
+        this.busy.set(false);
+        this.cdr.markForCheck();
+        this.showError(e);
+      },
     });
   }
 
