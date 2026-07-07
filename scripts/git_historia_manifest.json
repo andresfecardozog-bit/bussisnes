@@ -1,0 +1,338 @@
+{
+  "version": 1,
+  "description": "Manifiesto de commits sinteticos por fase (AGENTS.md). Reconstruye historial desde el arbol actual.",
+  "exclude_globs": [
+    "~$*",
+    "FLASH.xlsx",
+    "FLASH.xlsx - Sheet1.csv",
+    "PRE CORTE*.xlsx",
+    "PRE CORTE*.csv",
+    "homologacion materiales Nuevo.xlsx",
+    "resources/sheet.css",
+    "rvfebrero/**",
+    "data/**",
+    "logs/**",
+    "venv/**",
+    ".venv/**",
+    ".env",
+    ".env.*",
+    ".cursor/**",
+    "agent-transcripts/**"
+  ],
+  "prepare_fixtures": [
+    {
+      "dest": "tests/fixtures/PRE_CORTE_muestra.xlsx",
+      "sources": [
+        "PRE CORTE 13.02.2026 (1).xlsx",
+        "PRE CORTE 13.02.2026.xlsx"
+      ]
+    },
+    {
+      "dest": "tests/fixtures/homologacion.xlsx",
+      "sources": [
+        "homologacion materiales Nuevo.xlsx"
+      ]
+    },
+    {
+      "dest": "frontend/src/assets/logo.jpg",
+      "sources": [
+        "resources/image_720508810_0.jpg"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": "init",
+      "slug": "init",
+      "name": "Inicializacion del repositorio",
+      "status": "done",
+      "date": "2026-02-12T09:00:00-05:00",
+      "message": "chore: inicializar repositorio, gitignore y guia de historial por fases",
+      "doc": "docs/HISTORIA_FASES.md",
+      "paths": [
+        ".gitignore",
+        "docs/HISTORIA_FASES.md"
+      ]
+    },
+    {
+      "id": "0",
+      "slug": "fase-0",
+      "name": "Exploracion y fix de fecha",
+      "status": "done",
+      "date": "2026-02-13T10:00:00-05:00",
+      "message": "fix(fase-0): corregir extraccion de fecha de produccion en notebook de exploracion",
+      "doc": "docs/fases/00-exploracion.md",
+      "paths": [
+        "test.ipynb",
+        "_demo_matching.py",
+        "docs/fases/00-exploracion.md"
+      ]
+    },
+    {
+      "id": "1",
+      "slug": "fase-1",
+      "name": "Core Python deterministico",
+      "status": "done",
+      "date": "2026-02-14T11:00:00-05:00",
+      "message": "feat(fase-1): core de matching PRE CORTE vs FLASH (date_extractor, loaders, aggregator, matcher)",
+      "doc": "docs/fases/01-core-python.md",
+      "paths": [
+        "requirements.txt",
+        "app/__init__.py",
+        "app/core/__init__.py",
+        "app/core/date_extractor.py",
+        "app/core/loaders.py",
+        "app/core/aggregator.py",
+        "app/core/matcher.py",
+        "tests/__init__.py",
+        "tests/conftest.py",
+        "tests/test_date_extractor.py",
+        "tests/test_loaders.py",
+        "tests/test_aggregator.py",
+        "tests/test_matcher.py",
+        "tests/fixtures/FLASH_muestra.csv",
+        "docs/fases/01-core-python.md"
+      ]
+    },
+    {
+      "id": "2",
+      "slug": "fase-2",
+      "name": "Validadores anti-perdida y logging",
+      "status": "done",
+      "date": "2026-02-18T10:00:00-05:00",
+      "message": "feat(fase-2): validadores anti-perdida de datos y logging rotativo",
+      "doc": "docs/fases/02-validadores-logging.md",
+      "paths": [
+        "app/core/validators.py",
+        "app/core/logging_setup.py",
+        "tests/test_validators.py",
+        "docs/fases/02-validadores-logging.md"
+      ]
+    },
+    {
+      "id": "3",
+      "slug": "fase-3",
+      "name": "Historico SQLite con idempotencia",
+      "status": "done",
+      "date": "2026-02-21T10:00:00-05:00",
+      "message": "feat(fase-3): persistencia SQLite acumulada e idempotencia por par de hashes",
+      "doc": "docs/fases/03-historico-sqlite.md",
+      "paths": [
+        "app/core/db.py",
+        "tests/test_db.py",
+        "docs/fases/03-historico-sqlite.md"
+      ]
+    },
+    {
+      "id": "4",
+      "slug": "fase-4",
+      "name": "Backend FastAPI atomico",
+      "status": "done",
+      "date": "2026-07-02T09:00:00-05:00",
+      "message": "feat(fase-4): API FastAPI con pipeline atomico, runs y uploads batch",
+      "doc": "docs/fases/04-api-fastapi.md",
+      "paths": [
+        "app/config.py",
+        "app/api/__init__.py",
+        "app/api/dependencies.py",
+        "app/api/main.py",
+        "app/api/schemas.py",
+        "app/api/storage.py",
+        "app/api/routes/__init__.py",
+        "app/api/routes/files.py",
+        "app/api/routes/pipeline.py",
+        "app/api/routes/runs.py",
+        "run_backend.bat",
+        "tests/test_api.py",
+        "docs/fases/04-api-fastapi.md"
+      ]
+    },
+    {
+      "id": "4.5",
+      "slug": "fase-4-5",
+      "name": "RESUMEN + catalogo SKU",
+      "status": "done",
+      "date": "2026-07-02T15:00:00-05:00",
+      "message": "feat(fase-4.5): migrar intake a hoja RESUMEN y catalogo persistente SKU/SAP",
+      "doc": "docs/fases/04-5-resumen-catalogo.md",
+      "prepare_fixtures": true,
+      "paths": [
+        "app/core/resumen_parser.py",
+        "app/core/sku_catalog.py",
+        "app/core/loaders.py",
+        "app/core/validators.py",
+        "app/api/routes/catalog.py",
+        "app/api/main.py",
+        "app/api/schemas.py",
+        "tests/test_resumen_parser.py",
+        "tests/test_sku_catalog.py",
+        "tests/fixtures/PRE_CORTE_muestra.xlsx",
+        "tests/fixtures/homologacion.xlsx",
+        "docs/fases/04-5-resumen-catalogo.md"
+      ]
+    },
+    {
+      "id": "5",
+      "slug": "fase-5",
+      "name": "Streamlit UI (pendiente)",
+      "status": "pending",
+      "date": "2026-07-03T10:00:00-05:00",
+      "message": "docs(fase-5): registrar alcance pendiente de UI Streamlit y Copilot Studio",
+      "doc": "docs/fases/05-streamlit-pendiente.md",
+      "paths": [
+        "docs/fases/05-streamlit-pendiente.md"
+      ]
+    },
+    {
+      "id": "6",
+      "slug": "fase-6",
+      "name": "Export Excel formateado (KPI cumplimiento)",
+      "status": "done",
+      "date": "2026-07-06T09:00:00-05:00",
+      "message": "feat(fase-6): export Excel corporativo con KPI cumplimiento % y estilos NutriAvicola",
+      "doc": "docs/fases/06-export-excel.md",
+      "paths": [
+        "app/core/excel_style.py",
+        "app/core/exporters.py",
+        "app/api/routes/exports.py",
+        "resources/image_720508810_0.jpg",
+        "_demo_export.py",
+        "tests/test_excel_style.py",
+        "tests/test_exporters.py",
+        "docs/fases/06-export-excel.md"
+      ]
+    },
+    {
+      "id": "6.5",
+      "slug": "fase-6-5",
+      "name": "Excel multi-fecha (dailies + consolidado + zip)",
+      "status": "done",
+      "date": "2026-07-06T10:30:00-05:00",
+      "message": "feat(fase-6.5): batch multi-fecha con dailies, consolidado Por_Semana y zip",
+      "doc": "docs/fases/06-5-excel-multi-fecha.md",
+      "paths": [
+        "app/core/exporters.py",
+        "app/core/excel_style.py",
+        "tests/test_exporters.py",
+        "docs/fases/06-5-excel-multi-fecha.md"
+      ]
+    },
+    {
+      "id": "6.6",
+      "slug": "fase-6-6",
+      "name": "Calendario laboral colombiano",
+      "status": "done",
+      "date": "2026-07-06T11:30:00-05:00",
+      "message": "feat(fase-6.6): calendario laboral CO y salto de fecha_produccion a dia habil",
+      "doc": "docs/fases/06-6-calendario-laboral.md",
+      "paths": [
+        "app/core/calendario.py",
+        "app/core/date_extractor.py",
+        "app/api/routes/calendario.py",
+        "app/api/routes/files.py",
+        "resources/festivos_colombia_2024_2030.csv",
+        "scripts/generar_calendario.py",
+        "requirements-dev.txt",
+        "tests/test_calendario.py",
+        "tests/test_date_extractor.py",
+        "docs/fases/06-6-calendario-laboral.md"
+      ]
+    },
+    {
+      "id": "7A",
+      "slug": "fase-7a",
+      "name": "Modelo Batch (CRUD, preview, generate)",
+      "status": "done",
+      "date": "2026-07-06T13:00:00-05:00",
+      "message": "feat(fase-7A): modelo Batch con colisiones, ZIP de pre-cortes y generate de excels",
+      "doc": "docs/fases/07A-batch-modelo.md",
+      "paths": [
+        "app/core/batches.py",
+        "app/core/db.py",
+        "app/api/routes/batches.py",
+        "app/api/main.py",
+        "app/api/schemas.py",
+        "tests/test_batches.py",
+        "_smoke_e2e_curl.ps1",
+        "docs/fases/07A-batch-modelo.md"
+      ]
+    },
+    {
+      "id": "7B",
+      "slug": "fase-7b",
+      "name": "Docker + Railway + storage adapter",
+      "status": "done",
+      "date": "2026-07-06T15:00:00-05:00",
+      "message": "feat(fase-7B): Docker multi-stage, Railway, env vars y storage adapter local/Supabase",
+      "doc": "docs/fases/07B-docker-railway.md",
+      "paths": [
+        "Dockerfile",
+        ".dockerignore",
+        "railway.json",
+        ".env.example",
+        "app/config.py",
+        "app/core/storage_adapter.py",
+        "scripts/setup_supabase.py",
+        "docs/deploy_railway.md",
+        "tests/test_config.py",
+        "tests/test_storage_adapter.py",
+        "docs/fases/07B-docker-railway.md"
+      ]
+    },
+    {
+      "id": "7C",
+      "slug": "fase-7c",
+      "name": "Frontend Angular 22",
+      "status": "done",
+      "date": "2026-07-06T17:00:00-05:00",
+      "message": "feat(fase-7C): frontend Angular Material 3 con wizard de batches y descargas",
+      "doc": "docs/fases/07C-frontend-angular.md",
+      "prepare_fixtures": true,
+      "paths": [
+        "frontend/",
+        "docs/deploy_vercel.md",
+        "docs/fases/07C-frontend-angular.md"
+      ]
+    },
+    {
+      "id": "7D",
+      "slug": "fase-7d",
+      "name": "Orquestador n8n (pendiente)",
+      "status": "pending",
+      "date": "2026-07-06T18:00:00-05:00",
+      "message": "docs(fase-7D): registrar alcance pendiente del orquestador n8n en Railway",
+      "doc": "docs/fases/07D-n8n-pendiente.md",
+      "paths": [
+        "docs/fases/07D-n8n-pendiente.md"
+      ]
+    },
+    {
+      "id": "7E",
+      "slug": "fase-7e",
+      "name": "Supabase Storage integrado (pendiente)",
+      "status": "pending",
+      "date": "2026-07-06T18:30:00-05:00",
+      "message": "docs(fase-7E): registrar alcance pendiente de buckets Supabase y signed URLs",
+      "doc": "docs/fases/07E-supabase-pendiente.md",
+      "paths": [
+        "docs/fases/07E-supabase-pendiente.md"
+      ]
+    },
+    {
+      "id": "meta",
+      "slug": "meta",
+      "name": "Memoria del proyecto y herramientas",
+      "status": "done",
+      "date": "2026-07-06T19:00:00-05:00",
+      "message": "docs: AGENTS.md, manifiesto git por fases y scripts de reconstruccion de historial",
+      "doc": "docs/HISTORIA_FASES.md",
+      "paths": [
+        "AGENTS.md",
+        "scripts/git_historia_manifest.json",
+        "scripts/git_historia_por_fases.ps1",
+        "scripts/git_historia_por_fases.sh",
+        "docs/HISTORIA_FASES.md"
+      ]
+    }
+  ]
+}
