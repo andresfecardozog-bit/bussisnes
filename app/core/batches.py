@@ -74,15 +74,16 @@ def create_batch(
     conn: sqlite3.Connection,
     nombre: str | None = None,
     notas: str | None = None,
+    owner_user_id: int | None = None,
 ) -> str:
     """Crea un batch nuevo en estado `draft`. Retorna su id (uuid hex)."""
     batch_id = uuid.uuid4().hex
     conn.execute(
         """
-        INSERT INTO batches (id, status, nombre, notas)
-        VALUES (?, 'draft', ?, ?)
+        INSERT INTO batches (id, owner_user_id, status, nombre, notas)
+        VALUES (?, ?, 'draft', ?, ?)
         """,
-        (batch_id, nombre, notas),
+        (batch_id, owner_user_id, nombre, notas),
     )
     conn.commit()
     return batch_id
@@ -98,9 +99,13 @@ def list_batches(
     status: BatchStatus | None = None,
     limit: int = 50,
     include_archived: bool = False,
+    owner_user_id: int | None = None,
 ) -> list[dict[str, Any]]:
     q = "SELECT * FROM batches WHERE 1=1"
     params: list[Any] = []
+    if owner_user_id is not None:
+        q += " AND owner_user_id = ?"
+        params.append(owner_user_id)
     if status:
         q += " AND status = ?"
         params.append(status)

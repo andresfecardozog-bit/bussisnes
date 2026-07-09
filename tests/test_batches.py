@@ -50,7 +50,10 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setattr(cfg, "DB_PATH", db_path)
     monkeypatch.setattr(cfg, "UPLOADS_DIR", uploads_dir)
     monkeypatch.setattr(cfg, "ONEDRIVE_EXPORT_DIR", export_dir)
+    monkeypatch.setattr(cfg, "AUTH_COOKIE_SECURE", False)
     monkeypatch.setattr(core_db, "DB_PATH", db_path)
+    monkeypatch.setattr(core_db, "ADMIN_EMAIL", "admin@test.local")
+    monkeypatch.setattr(core_db, "ADMIN_INITIAL_PASSWORD", "AdminPass123!")
     monkeypatch.setattr(deps, "DB_PATH", db_path)
     monkeypatch.setattr(storage, "UPLOADS_DIR", uploads_dir)
     monkeypatch.setattr(batches_route, "ONEDRIVE_EXPORT_DIR", export_dir)
@@ -68,6 +71,23 @@ def client(isolated_env):
     with get_conn(isolated_env["db"]) as conn:
         import_from_homologacion(HOMOLOG_XLSX, conn)
     with TestClient(app) as c:
+        login = c.post(
+            "/auth/login",
+            json={"email": "admin@test.local", "password": "AdminPass123!"},
+        )
+        assert login.status_code == 200, login.text
+        csrf = c.cookies.get("nutri_csrf")
+        assert csrf
+        change = c.post(
+            "/auth/change-password",
+            json={
+                "current_password": "AdminPass123!",
+                "new_password": "AdminPass123!_nueva",
+            },
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert change.status_code == 200, change.text
+        c.headers.update({"X-CSRF-Token": c.cookies.get("nutri_csrf", "")})
         yield c
 
 

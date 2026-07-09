@@ -1,12 +1,4 @@
 :host {
   display: block;
-  min-height: 100vh;
-  background: var(--nutri-bg-app);
-}
-
-.nutri-toolbar-spacer { flex: 1 1 auto; }
-
-.nutri-main {
-  display: block;
-  min-height: calc(100vh - 64px);
+  height: 100%;
 }

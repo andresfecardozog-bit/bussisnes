@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import sqlite3
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from app.api import storage
 from app.api.dependencies import db_connection
+from app.api.security import AuthUser, require_permission
 from app.api.schemas import (
     CatalogEntry,
     CatalogListResponse,
@@ -24,12 +26,32 @@ from app.core.sku_catalog import (
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 
+def _safe_filename(raw: str | None, fallback: str) -> str:
+    base = Path(raw or fallback).name.strip()
+    return base or fallback
+
+
+def _read_upload_limited(upload: UploadFile, max_bytes: int) -> bytes:
+    total = 0
+    chunks: list[bytes] = []
+    while True:
+        chunk = upload.file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(status_code=413, detail="Archivo excede el limite permitido")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @router.get("", response_model=CatalogListResponse)
 def get_catalog(
     referencia: str | None = Query(default=None),
     tipo: str | None = Query(default=None),
     formato: str | None = Query(default=None),
     limit: int = Query(default=500, ge=1, le=5000),
+    _: AuthUser = Depends(require_permission("catalog:read")),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> CatalogListResponse:
     """Lista entradas del catalogo con filtros opcionales."""
@@ -52,6 +74,7 @@ def get_catalog(
 @router.post("/manual-mapping", response_model=ManualMappingResponse)
 def post_manual_mapping(
     payload: ManualMappingRequest,
+    _: AuthUser = Depends(require_permission("catalog:write")),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> ManualMappingResponse:
     """Registra un mapping manual (prioridad maxima: sobrescribe otros)."""
@@ -76,18 +99,23 @@ def post_manual_mapping(
 @router.post("/import-homologacion", response_model=dict)
 def post_import_homologacion(
     file: UploadFile = File(...),
+    _: AuthUser = Depends(require_permission("catalog:write")),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> dict:
     """Sube un archivo `homologacion materiales Nuevo.xlsx` y actualiza el catalogo."""
-    filename = file.filename or "homologacion.xlsx"
+    from app.config import MAX_UPLOAD_BYTES
+
+    filename = _safe_filename(file.filename, "homologacion.xlsx")
     ext = Path(filename).suffix.lower()
     if ext not in {".xlsx", ".xlsm"}:
         raise HTTPException(
             status_code=415,
             detail=f"La homologacion debe ser .xlsx (recibido '{ext}')",
         )
-    content = file.file.read()
-    tmp_path = storage.UPLOADS_DIR / f"_tmp_homolog_{filename}"
+    content = _read_upload_limited(file, MAX_UPLOAD_BYTES)
+    if not content.startswith(b"PK"):
+        raise HTTPException(status_code=415, detail="La homologacion no parece un Excel valido")
+    tmp_path = storage.UPLOADS_DIR / f"_tmp_homolog_{uuid.uuid4().hex[:8]}_{filename}"
     tmp_path.write_bytes(content)
     try:
         stats = import_from_homologacion(tmp_path, conn)

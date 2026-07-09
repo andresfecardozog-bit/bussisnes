@@ -480,13 +480,32 @@ def api_client_con_cruce(db_con_cruce, tmp_path, monkeypatch):
     import app.core.db as core_db
 
     monkeypatch.setattr(cfg, "DB_PATH", db_con_cruce)
+    monkeypatch.setattr(cfg, "AUTH_COOKIE_SECURE", False)
     monkeypatch.setattr(core_db, "DB_PATH", db_con_cruce)
+    monkeypatch.setattr(core_db, "ADMIN_EMAIL", "admin@test.local")
+    monkeypatch.setattr(core_db, "ADMIN_INITIAL_PASSWORD", "AdminPass123!")
     monkeypatch.setattr(deps, "DB_PATH", db_con_cruce)
     monkeypatch.setattr(storage, "UPLOADS_DIR", uploads_dir)
     monkeypatch.setattr(exports_route, "ONEDRIVE_EXPORT_DIR", export_dir)
 
     from app.api.main import app
     with TestClient(app) as c:
+        login = c.post(
+            "/auth/login",
+            json={"email": "admin@test.local", "password": "AdminPass123!"},
+        )
+        assert login.status_code == 200, login.text
+        csrf = c.cookies.get("nutri_csrf")
+        assert csrf
+        change = c.post(
+            "/auth/change-password",
+            json={
+                "current_password": "AdminPass123!",
+                "new_password": "AdminPass123!_nueva",
+            },
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert change.status_code == 200, change.text
         yield c
 
 

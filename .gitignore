@@ -22,14 +22,33 @@ htmlcov/
 .ruff_cache/
 
 # --- Data local (NO commitear; Railway usa volumen persistente) ---
-data/historico.sqlite
-data/historico.sqlite-journal
-data/historico.sqlite-wal
-data/historico.sqlite-shm
-data/uploads/
-data/runs/
-data/onedrive_export/
-data/logs/
+data/
+!data/.gitkeep
+
+# --- Datos reales de negocio (NO commitear archivos operativos) ---
+# Estos archivos se suben via la UI de la plataforma, no viven en el repo.
+# Las muestras recortadas para tests SI viven en tests/fixtures/.
+data_nivel_cumplimiento/
+FLASH.xlsx
+FLASH.xlsm
+FLASH.xlsx*.csv
+PRE CORTE*.xlsx
+PRE CORTE*.xlsm
+PRE CORTE*.csv
+homologacion*.xlsx
+homologacion*.xlsm
+rvfebrero/
+rv*/
+# Archivos temporales de Excel/Office (~$ prefijo)
+~$*
+*.tmp
+
+# --- Notebooks intermedios ---
+.ipynb_checkpoints/
+*.ipynb_output/
+
+# --- Recursos gigantes que no son runtime ---
+resources/sheet.css
 
 # --- Logs ---
 logs/

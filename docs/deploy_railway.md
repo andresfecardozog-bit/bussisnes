@@ -30,9 +30,39 @@ Guia paso a paso para deployar la API en Railway con volumen persistente
 **Critico**: SQLite + uploads viven en `/data`. Sin volumen, cada deploy
 borra el historico.
 
-1. En el servicio -> `Settings` -> `Volumes` -> `+ New Volume`.
-2. Mount path: `/data`.
-3. Size: 1 GB (mas que suficiente para meses de operacion).
+**UI actualizada (Railway 2025)** — la opcion cambio de lugar:
+
+**Opcion A - via Command Palette (rapida)**:
+
+1. Abre el servicio (click en su card).
+2. Presiona `Ctrl+K` (o `Cmd+K` en Mac) -> escribe `create volume`.
+3. Selecciona `Create Volume`.
+4. Mount path: `/data`.
+5. Se crea con 1 GB por default (Free plan: 500 MB max; Hobby $5: 5 GB).
+
+**Opcion B - via UI del servicio**:
+
+1. Abre el servicio.
+2. Al lado del boton **Deployments / Metrics / Settings**, busca el
+   tab llamado **Data** o **Storage** (nombre varia por version).
+3. `+ Add Volume` (o `+ New Volume`).
+4. Mount path: `/data`.
+
+**Opcion C - via el proyecto (workaround si el servicio no la tiene)**:
+
+1. En la vista del **proyecto** (no del servicio), click en `+ Create`
+   arriba a la derecha.
+2. Selecciona `Volume`.
+3. Asocia al servicio y define mount path `/data`.
+
+Despues de crear el volumen, Railway hace re-deploy automatico. Verifica
+en los logs que aparezca `chown -R nutri:nutri /data` (del entrypoint) sin
+errores.
+
+**Nota importante**: aunque el volumen se cree como root:root en el mount,
+el `docker-entrypoint.sh` de este proyecto lo arregla en runtime haciendo
+`chown` antes de arrancar uvicorn. Por eso el container corre como root
+al inicio y luego drop-de-privilegios a `nutri` para el proceso Python.
 
 ## Paso 3: variables de entorno
 
@@ -42,7 +72,7 @@ En `Settings` -> `Variables` agregar:
 NUTRI_DATA_DIR=/data
 NUTRI_LOGS_DIR=/data/logs
 NUTRI_API_HOST=0.0.0.0
-NUTRI_CORS_ORIGINS=https://<tu-app>.vercel.app,https://<preview>.vercel.app
+NUTRI_CORS_ORIGINS=https://cumplimientoplataforma.vercel.app,https://cumplimiento-plataforma-*.vercel.app,https://cumplimientoplataforma-*.vercel.app
 ```
 
 `PORT` la inyecta Railway automaticamente; no la definas manualmente.
@@ -124,13 +154,61 @@ Cuando cierres el proyecto:
 
 ## Troubleshooting
 
-- **Build falla por wheel de Pillow / numpy**: la imagen usa Python 3.14
-  y algunos wheels binarios pueden no existir aun. El builder tiene
-  `build-essential`; compila desde source si es necesario (tarda mas).
-- **Healthcheck falla**: verifica que `PORT` este siendo respetado y que
-  no haya errores de import en logs. `NUTRI_DATA_DIR` debe apuntar a un
-  directorio con permisos (`/data` con el volumen montado).
-- **Supabase 403 "row-level security policy"**: estas usando la
-  publishable key en vez de la secret. Cambia a `sb_secret_...`.
-- **SQLite lock**: SQLite serializa writes. Un solo replica (por default).
-  Si necesitas escalar, migra a Postgres (Fase 7F opcional).
+### Healthcheck falla en el primer deploy
+
+Sintoma en Deploy Logs:
+```
+Attempt #1 failed with service unavailable. Continuing to retry for 19s
+Attempt #2 failed with service unavailable. Continuing to retry for 8s
+1/1 replicas never became healthy!
+```
+
+Causas comunes:
+
+1. **Cold start > 30s**: Python 3.14 + pandas + openpyxl + Pillow +
+   supabase-py tarda ~30-45s en importar en el primer arranque.
+   `railway.json` ya tiene `healthcheckTimeout: 300` (5 min buffer).
+2. **Falta libjpeg/zlib para Pillow**: el runtime stage ahora instala
+   `libjpeg62-turbo, zlib1g, libopenjp2-7, libtiff6`. Sin ellas, el
+   `import PIL` en Python falla al hacer `import _imaging`.
+3. **Permisos del volumen**: si `/data` es root:root y el user es `nutri`,
+   `init_db()` falla con PermissionError. El `docker-entrypoint.sh` hace
+   `chown -R nutri:nutri /data` antes de arrancar uvicorn.
+4. **`PORT` no llega al proceso**: verifica en Deploy Logs que aparezca
+   `Uvicorn running on http://0.0.0.0:<puerto>`. Si dice `port 8000` en
+   vez del puerto real de Railway, hay un problema con `$PORT`.
+
+**Como diagnosticar**:
+
+1. Railway UI -> tu servicio -> `Deployments` -> click en el deploy
+   fallido -> `View Logs` (o `Deploy Logs`).
+2. Busca cualquiera de estos indicadores:
+   - `ModuleNotFoundError` -> falta una dep en `requirements.txt`.
+   - `Permission denied: '/data/...'` -> volumen sin permisos, revisa
+     que el entrypoint corrio.
+   - `Address already in use` -> conflicto de puertos.
+   - Ausencia de linea `Uvicorn running on ...` -> no arranco uvicorn.
+3. Si no hay errores obvios pero tarda mucho: aumenta
+   `healthcheckTimeout` a `600` en `railway.json` y re-deploy.
+
+### Build falla por wheel de Pillow / numpy
+
+La imagen usa Python 3.14 y algunos wheels pueden no existir aun. El
+builder tiene `build-essential`; compila desde source si es necesario
+(tarda mas, pero funciona).
+
+### Supabase 403 "row-level security policy"
+
+Estas usando la publishable key (`sb_publishable_...`) en vez de la
+secret (`sb_secret_...`). Cambia el valor de `SUPABASE_SERVICE_KEY` en
+Railway env vars.
+
+### SQLite lock
+
+SQLite serializa writes. `numReplicas: 1` en `railway.json` evita
+concurrencia. Si necesitas escalar, migra a Postgres (Fase 7F opcional).
+
+### El volumen no se ve en Settings
+
+Railway rediseno la UI. Ver Paso 2 arriba: usar Command Palette
+(`Ctrl+K` -> `create volume`) o el tab `Storage`/`Data` del servicio.

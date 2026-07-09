@@ -13,13 +13,30 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import batches, calendario, catalog, exports, files, pipeline, runs
+from app.api.routes import auth
+from app.api.routes import (
+    batches,
+    calendario,
+    catalog,
+    exports,
+    files,
+    pipeline,
+    profiles,
+    runs,
+)
+from app.api.security import require_auth, require_permission
 from app.api.schemas import HealthResponse
-from app.config import API_CORS_ORIGINS
+from app.config import (
+    API_CORS_HEADERS,
+    API_CORS_METHODS,
+    API_CORS_ORIGINS,
+    ENABLE_API_DOCS,
+    IS_PRODUCTION,
+)
 from app.core.db import init_db
 
 
@@ -39,27 +56,32 @@ app = FastAPI(
     ),
     version=__version__,
     lifespan=lifespan,
+    docs_url="/docs" if ENABLE_API_DOCS else None,
+    redoc_url="/redoc" if ENABLE_API_DOCS else None,
+    openapi_url="/openapi.json" if ENABLE_API_DOCS else None,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=API_CORS_ORIGINS + ["*"],
+    allow_origins=API_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=API_CORS_METHODS,
+    allow_headers=API_CORS_HEADERS,
 )
 
 
 @app.get("/", tags=["meta"])
 def root() -> dict[str, str]:
     """Landing JSON con links utiles. Evita 502 cuando alguien pega la URL raiz."""
-    return {
+    out = {
         "service": "NutriAvicola - PRE CORTE vs FLASH API",
         "version": __version__,
-        "docs": "/docs",
         "health": "/health",
-        "openapi": "/openapi.json",
     }
+    if ENABLE_API_DOCS:
+        out["docs"] = "/docs"
+        out["openapi"] = "/openapi.json"
+    return out
 
 
 @app.get("/health", response_model=HealthResponse, tags=["meta"])
@@ -69,10 +91,35 @@ def health() -> HealthResponse:
     )
 
 
-app.include_router(files.router)
-app.include_router(runs.router)
-app.include_router(pipeline.router)
-app.include_router(catalog.router)
-app.include_router(exports.router)
-app.include_router(calendario.router)
-app.include_router(batches.router)
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-XSS-Protection", "0")
+    if IS_PRODUCTION:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+    if request.url.path.startswith(
+        ("/profiles", "/batches", "/runs", "/pipeline", "/catalog", "/kpis", "/files")
+    ):
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
+
+
+def _include_private_router(router, *deps):
+    dependencies = [Depends(require_auth), *deps]
+    app.include_router(router, dependencies=dependencies)
+
+
+app.include_router(auth.router)
+_include_private_router(files.router)
+_include_private_router(runs.router)
+_include_private_router(pipeline.router)
+_include_private_router(catalog.router)
+_include_private_router(exports.router, Depends(require_permission("download:all")))
+_include_private_router(calendario.router)
+_include_private_router(batches.router)
+_include_private_router(profiles.router)

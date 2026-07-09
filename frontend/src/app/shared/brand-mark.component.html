@@ -1,0 +1,27 @@
+<span class="brand-mark" [class.brand-mark--compact]="compact()">
+  <span class="brand-mark__egg" aria-hidden="true">
+    <svg viewBox="0 0 64 80" focusable="false">
+      <defs>
+        <linearGradient id="eggGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#FFE79A"></stop>
+          <stop offset="45%" stop-color="#E6B73C"></stop>
+          <stop offset="100%" stop-color="#A06B09"></stop>
+        </linearGradient>
+      </defs>
+      <ellipse cx="32" cy="40" rx="24" ry="32" fill="url(#eggGradient)"></ellipse>
+      <path
+        d="M20 25C23 18 30 15 37 17"
+        fill="none"
+        stroke="rgba(255,255,255,0.45)"
+        stroke-width="4"
+        stroke-linecap="round"
+      ></path>
+    </svg>
+  </span>
+  <span class="brand-mark__text">
+    <strong class="brand-mark__title">Business Intelligen't</strong>
+    @if (!compact()) {
+      <span class="brand-mark__subtitle">Plataforma de cruces BI automatizados</span>
+    }
+  </span>
+</span>

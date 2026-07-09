@@ -1,0 +1,64 @@
+<div class="shell">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" role="navigation" aria-label="Navegación principal">
+    <!-- Logo -->
+    <a routerLink="/app/dashboard" class="sidebar__brand" aria-label="Business Intelligen't — Inicio">
+      <app-brand-mark [compact]="true"></app-brand-mark>
+    </a>
+
+    <!-- Nav items -->
+    <nav class="sidebar__nav">
+      <a routerLink="/app/dashboard" routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: true }"
+         class="sidebar__item" aria-label="Inicio">
+        <span class="sidebar__item-icon">
+          <mat-icon>home</mat-icon>
+        </span>
+        <span class="sidebar__item-label">Inicio</span>
+      </a>
+
+      <a routerLink="/app/procesos" routerLinkActive="active"
+         class="sidebar__item" aria-label="Procesos de cruce">
+        <span class="sidebar__item-icon">
+          <mat-icon>hub</mat-icon>
+        </span>
+        <span class="sidebar__item-label">Procesos</span>
+      </a>
+
+      <a routerLink="/app/procesos/nuevo" routerLinkActive="active"
+         class="sidebar__item sidebar__item--cta" aria-label="Nuevo proceso de cruce">
+        <span class="sidebar__item-icon">
+          <mat-icon>add_circle</mat-icon>
+        </span>
+        <span class="sidebar__item-label">Nuevo cruce</span>
+      </a>
+
+      <a routerLink="/app/batches/nuevo" routerLinkActive="active"
+         class="sidebar__item" aria-label="Nuevo batch (PRE CORTE vs FLASH)">
+        <span class="sidebar__item-icon">
+          <mat-icon>bolt</mat-icon>
+        </span>
+        <span class="sidebar__item-label">Batch rápido</span>
+      </a>
+    </nav>
+
+    <!-- Spacer -->
+    <div class="sidebar__spacer"></div>
+
+    <div class="sidebar__session">
+      <div class="sidebar__session-email">{{ user()?.email || 'usuario' }}</div>
+      <button type="button" class="sidebar__logout" (click)="logout()">Cerrar sesión</button>
+    </div>
+
+    <!-- Footer brand -->
+    <div class="sidebar__footer">
+      <span class="sidebar__footer-text">NutriAvicola S.A.S.</span>
+      <span class="sidebar__footer-sub">Plataforma BI</span>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="shell__main">
+    <router-outlet />
+  </main>
+</div>

@@ -1,0 +1,144 @@
+<div class="nutri-page nutri-stack">
+  <header class="nutri-page-header">
+    <div>
+      <p class="nutri-eyebrow">Plataforma de cruces</p>
+      <h1 class="nutri-page-header__title">Nuevo proceso de cruce</h1>
+      <p class="nutri-page-header__subtitle">
+        Sube las dos fuentes y describe el proceso. El equipo de agentes las
+        analiza, te hace las preguntas necesarias y propone el cruce completo
+        para tu aprobacion.
+      </p>
+    </div>
+    <div class="nutri-page-header__actions">
+      <a mat-stroked-button routerLink="/procesos">
+        <mat-icon>arrow_back</mat-icon>
+        Volver al listado
+      </a>
+    </div>
+  </header>
+
+  @if (busy()) {
+    <section class="nutri-card nutri-card--featured">
+      <div class="nutri-loading">
+        <mat-spinner diameter="44"></mat-spinner>
+        <span class="analyzing-title">Los agentes estan analizando tus archivos...</span>
+        <span class="nutri-muted">
+          SchemaScout revisa la estructura, MappingArchitect propone el cruce,
+          KpiDesigner disena los indicadores y ReportDesigner el reporte.
+          Esto puede tardar un par de minutos.
+        </span>
+      </div>
+    </section>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()" class="nutri-card nutri-stack">
+      @if (error()) {
+        <div class="nutri-alert bad" role="alert">
+          <mat-icon>error_outline</mat-icon>
+          <div class="nutri-alert__body">
+            <p class="nutri-alert__title">No se pudo crear la propuesta</p>
+            <p>{{ error() }}</p>
+          </div>
+        </div>
+      }
+
+      <div>
+        <h2 class="nutri-section-title">1. Identificador del proceso</h2>
+        <mat-form-field appearance="outline" class="field-wide">
+          <mat-label>Identificador (snake_case)</mat-label>
+          <input matInput formControlName="profile_id"
+                 placeholder="ej. cen_vs_sap_cumplimiento" autocomplete="off" />
+          <mat-hint>Minusculas, numeros y guion bajo; debe empezar con letra.</mat-hint>
+          @if (form.controls.profile_id.hasError('pattern')) {
+            <mat-error>Solo minusculas, numeros y guion bajo (ej. cen_vs_sap_v1).</mat-error>
+          }
+          @if (form.controls.profile_id.hasError('required')) {
+            <mat-error>El identificador es obligatorio.</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div>
+        <h2 class="nutri-section-title">2. Describe el proceso</h2>
+        <mat-form-field appearance="outline" class="field-wide">
+          <mat-label>Brief para los agentes</mat-label>
+          <textarea matInput formControlName="brief" rows="7"
+            placeholder="Describe el proceso como se lo contarias a un colega analista: que contiene cada archivo, que quieres medir, como se relacionan las fuentes, que reportes esperas. Ej.: 'El primer archivo trae las ordenes de compra que llegan por la plataforma CEN; el segundo es el export de ventas de SAP. Quiero medir el nivel de cumplimiento de entregas por orden y por item.'"></textarea>
+          <mat-hint>Entre mas contexto des, menos preguntas tendran que hacerte los agentes.</mat-hint>
+          @if (form.controls.brief.hasError('minlength')) {
+            <mat-error>Describe el proceso con un poco mas de detalle (minimo 20 caracteres).</mat-error>
+          }
+          @if (form.controls.brief.hasError('required')) {
+            <mat-error>El brief es obligatorio.</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div>
+        <h2 class="nutri-section-title">3. Fuentes de datos</h2>
+        <div class="files-grid">
+          <div class="file-slot" [class.file-slot--filled]="leftFile()">
+            <p class="nutri-eyebrow">Fuente izquierda (plan / ordenes)</p>
+            <p class="nutri-muted">
+              La fuente de referencia del cruce: lo planeado, pedido u ordenado.
+            </p>
+            <input type="file" hidden #leftInput accept=".xlsx,.xls,.csv"
+                   (change)="onFileSelected('left', $event)" />
+            <div class="nutri-actions">
+              <button mat-stroked-button type="button" (click)="leftInput.click()">
+                <mat-icon>upload_file</mat-icon>
+                {{ leftFile() ? 'Cambiar archivo' : 'Seleccionar archivo' }}
+              </button>
+              @if (leftFile(); as f) {
+                <span class="nutri-badge info">{{ f.name }}</span>
+              }
+            </div>
+          </div>
+
+          <div class="file-slot" [class.file-slot--filled]="rightFile()">
+            <p class="nutri-eyebrow">Fuente derecha (real / entregas)</p>
+            <p class="nutri-muted">
+              La fuente contra la que se compara: lo producido, entregado o facturado.
+            </p>
+            <input type="file" hidden #rightInput accept=".xlsx,.xls,.csv"
+                   (change)="onFileSelected('right', $event)" />
+            <div class="nutri-actions">
+              <button mat-stroked-button type="button" (click)="rightInput.click()">
+                <mat-icon>upload_file</mat-icon>
+                {{ rightFile() ? 'Cambiar archivo' : 'Seleccionar archivo' }}
+              </button>
+              @if (rightFile(); as f) {
+                <span class="nutri-badge info">{{ f.name }}</span>
+              }
+            </div>
+          </div>
+
+          <div class="file-slot" [class.file-slot--filled]="homologacionFile()">
+            <p class="nutri-eyebrow">Homologacion (opcional)</p>
+            <p class="nutri-muted">
+              Catalogo maestro para traducir codigos tecnicos (material, cliente,
+              distrito) a nombres legibles en los entregables.
+            </p>
+            <input type="file" hidden #homologInput accept=".xlsx,.xls,.csv"
+                   (change)="onFileSelected('homologacion', $event)" />
+            <div class="nutri-actions">
+              <button mat-stroked-button type="button" (click)="homologInput.click()">
+                <mat-icon>upload_file</mat-icon>
+                {{ homologacionFile() ? 'Cambiar archivo' : 'Adjuntar archivo' }}
+              </button>
+              @if (homologacionFile(); as f) {
+                <span class="nutri-badge info">{{ f.name }}</span>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nutri-actions nutri-actions--end">
+        <button mat-flat-button color="primary" type="submit" [disabled]="!canSubmit">
+          <mat-icon>smart_toy</mat-icon>
+          Enviar a los agentes
+        </button>
+      </div>
+    </form>
+  }
+</div>

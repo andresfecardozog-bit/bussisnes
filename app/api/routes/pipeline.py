@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import date
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -213,11 +214,11 @@ def validate_step(
         "num_filas_original": flash_carga["num_filas_original"],
         "num_filas_procesadas": flash_carga["num_filas_procesadas"],
     }
-    pre_src = storage.UPLOADS_DIR.glob(f"{pre_carga['id']}.*")
-    flash_src = storage.UPLOADS_DIR.glob(f"{flash_carga['id']}.*")
-    pre_path = next((p for p in pre_src if p.suffix != ".pkl"), None)
-    flash_path = next((p for p in flash_src if p.suffix != ".pkl"), None)
-    if not pre_path or not flash_path:
+    pre_ext = Path(str(pre_carga["filename"])).suffix.lstrip(".").lower() or "xlsx"
+    flash_ext = Path(str(flash_carga["filename"])).suffix.lstrip(".").lower() or "csv"
+    pre_path = storage.upload_source_path(pre_carga["id"], pre_ext)
+    flash_path = storage.upload_source_path(flash_carga["id"], flash_ext)
+    if not pre_path.exists() or not flash_path.exists():
         raise HTTPException(500, "No se encontraron los archivos originales para validar")
 
     validaciones = run_all_validations(

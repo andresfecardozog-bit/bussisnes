@@ -1,0 +1,70 @@
+<main class="login-page">
+  <section class="login-card">
+    <h1>Business Intelligen't</h1>
+    <p class="subtitle">Acceso seguro a la plataforma de cruces BI</p>
+
+    @if (error(); as err) {
+      <div class="alert alert--error">{{ err }}</div>
+    }
+    @if (info(); as msg) {
+      <div class="alert alert--info">{{ msg }}</div>
+    }
+
+    @if (!forcePasswordChange()) {
+      <form (ngSubmit)="submitLogin()" class="form">
+        <label>
+          Correo
+          <input
+            type="email"
+            [ngModel]="email()"
+            (ngModelChange)="email.set($event)"
+            name="email"
+            autocomplete="username"
+            required
+          />
+        </label>
+
+        <label>
+          Contraseña
+          <input
+            type="password"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+            name="password"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+
+        <button type="submit" [disabled]="loading()">Ingresar</button>
+      </form>
+    } @else {
+      <form (ngSubmit)="submitPasswordChange()" class="form">
+        <label>
+          Contraseña actual
+          <input
+            type="password"
+            [ngModel]="currentPassword()"
+            (ngModelChange)="currentPassword.set($event)"
+            name="currentPassword"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+        <label>
+          Nueva contraseña (mínimo 12 caracteres)
+          <input
+            type="password"
+            [ngModel]="newPassword()"
+            (ngModelChange)="newPassword.set($event)"
+            name="newPassword"
+            minlength="12"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <button type="submit" [disabled]="loading()">Actualizar contraseña</button>
+      </form>
+    }
+  </section>
+</main>

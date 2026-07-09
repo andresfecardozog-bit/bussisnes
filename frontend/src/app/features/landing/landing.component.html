@@ -1,0 +1,136 @@
+<div class="landing">
+
+  <!-- ═══════════════════ NAVBAR ═══════════════════ -->
+  <header class="landing-nav">
+    <app-brand-mark></app-brand-mark>
+    <nav class="landing-nav__links" aria-label="Navegación landing">
+      <a class="landing-nav__link" href="#como-funciona">Cómo funciona</a>
+      <a class="landing-nav__link" href="#casos">Casos de uso</a>
+      <a class="landing-nav__link" href="#contacto">Contacto</a>
+    </nav>
+    <a class="landing-btn-primary" routerLink="/app/dashboard">
+      Ingresar →
+    </a>
+  </header>
+
+  <!-- ═══════════════════ HERO ═══════════════════ -->
+  <section class="landing-hero" appRevealOnScroll>
+    <div class="landing-hero__copy">
+      <p class="landing-hero__eyebrow">Automatización inteligente para BI</p>
+      <h1 class="landing-hero__h1">
+        Cruces de datos<br>
+        automáticos,<br>
+        <span class="landing-hero__h1-accent">en minutos.</span>
+      </h1>
+      <p class="landing-hero__lead">
+        <strong>Business Intelligen't</strong> conecta tus fuentes, cruza la información
+        y la convierte en decisiones que impulsan el negocio. Sin configurar columnas.
+        Sin fórmulas. Sin código.
+      </p>
+      <div class="landing-hero__cta">
+        <a class="landing-btn-primary landing-btn-primary--lg" routerLink="/app/dashboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 4.5L21 12l-7.5 7.5M3 12h18"/></svg>
+          Ingresar a la plataforma
+        </a>
+        <a class="landing-btn-ghost" routerLink="/app/procesos/nuevo">
+          Iniciar nuevo proceso
+        </a>
+      </div>
+    </div>
+
+    <!-- HUEVO DORADO -->
+    <div class="landing-hero__visual" aria-hidden="true">
+      <div class="egg-halo egg-halo--outer"></div>
+      <div class="egg-halo egg-halo--inner"></div>
+      <div class="egg-shape">
+        <div class="egg-shape__shine"></div>
+        <span class="egg-shape__label">Datos &rarr; Decisiones</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CÓMO FUNCIONA ═══════════════════ -->
+  <section id="como-funciona" class="landing-section" appRevealOnScroll [revealDelay]="100">
+    <div class="landing-section__header">
+      <h2 class="landing-section__title">Cómo funciona</h2>
+      <p class="landing-section__sub">Tres pasos simples para transformar tus datos en información accionable.</p>
+    </div>
+    <div class="steps-grid">
+      <article class="step-card">
+        <span class="step-card__num">1</span>
+        <div class="step-card__icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+        </div>
+        <h3 class="step-card__title">Sube tus archivos</h3>
+        <p class="step-card__body">Conecta o arrastra tus ventas, producción, inventarios y más. Soportamos Excel, CSV y bases de datos.</p>
+      </article>
+      <article class="step-card">
+        <span class="step-card__num">2</span>
+        <div class="step-card__icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          </svg>
+        </div>
+        <h3 class="step-card__title">Conversa con los agentes</h3>
+        <p class="step-card__body">Nuestros agentes de IA entienden tu negocio, cruzan los datos y responden tus preguntas en lenguaje natural.</p>
+      </article>
+      <article class="step-card">
+        <span class="step-card__num">3</span>
+        <div class="step-card__icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <rect x="18" y="3" width="4" height="18" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="2" y="13" width="4" height="8" rx="1"/>
+          </svg>
+        </div>
+        <h3 class="step-card__title">Descarga Excel y Power BI</h3>
+        <p class="step-card__body">Obtén tus resultados listos para analizar y compartir. Exporta a Excel o conéctate a Power BI en un clic.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ MÉTRICAS ═══════════════════ -->
+  <section id="casos" class="landing-metrics" appRevealOnScroll [revealDelay]="140">
+    <div class="metric-stat">
+      <span class="metric-stat__value" [appCountUp]="98" [suffix]="'%'">98%</span>
+      <span class="metric-stat__label">Cruces automáticos exitosos</span>
+    </div>
+    <div class="metric-divider"></div>
+    <div class="metric-stat">
+      <span class="metric-stat__value" [appCountUp]="80" [suffix]="'%'">80%</span>
+      <span class="metric-stat__label">Ahorro de tiempo en análisis</span>
+    </div>
+    <div class="metric-divider"></div>
+    <div class="metric-stat">
+      <span class="metric-stat__value">+<span [appCountUp]="120">120</span></span>
+      <span class="metric-stat__label">Reportes generados por día</span>
+    </div>
+    <div class="metric-divider"></div>
+    <div class="metric-stat">
+      <span class="metric-stat__value">+<span [appCountUp]="1"></span></span>
+      <span class="metric-stat__label">Cliente medio satisfecho</span>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer id="contacto" class="landing-footer" appRevealOnScroll [revealDelay]="160">
+    <div class="landing-footer__brand">
+      <app-brand-mark></app-brand-mark>
+      <p class="landing-footer__tagline">Inteligencia que produce.</p>
+    </div>
+    <div class="landing-footer__col">
+      <h4 class="landing-footer__colhead">Contacto BI</h4>
+      <p>nosequecorreotengotodaviaperdon&#64;nutriavicola.com</p>
+      <p>tampocotengotelefono</p>
+    </div>
+    <div class="landing-footer__col">
+      <h4 class="landing-footer__colhead">Soporte operativo</h4>
+      <p>Lunes a viernes · 7:00 a.m. – 5:00 p.m.</p>
+      <p>Equipo de BI</p>
+    </div>
+    <a class="landing-btn-primary" routerLink="/app/dashboard">
+      Entrar ahora →
+    </a>
+  </footer>
+
+</div>

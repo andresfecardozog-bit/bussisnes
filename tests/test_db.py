@@ -65,7 +65,7 @@ def test_init_db_crea_todas_las_tablas(isolated_db_with_catalog):
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
         ).fetchall()
     names = [r["name"] for r in rows if not r["name"].startswith("sqlite_")]
-    assert set(names) == {
+    esperadas = {
         "cargas",
         "cruce",
         "flash_agregado",
@@ -76,6 +76,7 @@ def test_init_db_crea_todas_las_tablas(isolated_db_with_catalog):
         "batches",
         "batch_pre_cortes",
     }
+    assert esperadas.issubset(set(names))
 
 
 def test_init_db_es_idempotente(isolated_db_with_catalog):

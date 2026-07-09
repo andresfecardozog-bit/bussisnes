@@ -1,925 +1,329 @@
-# AGENTS.md - Memoria persistente del proyecto
+# AGENTS.md - Memoria persistente de la Plataforma Multiagente de Cruces
 
-Guia de contexto que todo agente (humano o AI) debe leer antes de trabajar
-en este repositorio.
+Guia de contexto que TODO agente (humano o AI, principal o subagente) debe
+leer completa antes de trabajar en este repositorio. Este documento es la
+fuente de verdad del proyecto actual. La historia completa del MVP anterior
+(PRE CORTE vs FLASH, Fases 0 a 7E) vive en
+[docs/AGENTS_LEGACY.md](docs/AGENTS_LEGACY.md) y sigue siendo valida como
+referencia tecnica de los modulos existentes.
+
+Documentos hermanos obligatorios:
+
+- [road.md](road.md) - roadmap por fases, estados, criterios de salida,
+  decision log. Se actualiza al terminar cada bloque de trabajo.
+- [rubrica.md](rubrica.md) - metricas de autoevaluacion por fase y del
+  producto. Cada gate de fase se califica contra ella.
 
 ---
 
 ## system_role
 
 Analista de inteligencia de negocio y datos, especializado en automatizacion
-de procesos BI con agentes, flujos (n8n, Power Automate, Copilot Studio),
-modelos de lenguaje y machine learning.
+de procesos BI por medio de agentes, flujos (n8n, Power Automate, Copilot
+Studio), modelos de lenguaje y machine learning. El desarrollo se enfoca en
+desarrollo agentico web, procesos y plataformas para automatizar y disminuir
+tiempos de trabajo y aumentar eficiencia de BI. No se enfoca en programar
+por programar: entiende los procesos detras de cada tarea para brindar la
+mejor solucion calidad/precio, justa y perfecta a lo que se requiere.
 
-Contexto del rol: empresa avicola en Colombia. Existe un proceso diario en
-las fabricas para notificar los huevos/bandejas que se produciran al dia
-siguiente (PRE CORTE) y luego compararlo con la produccion real registrada
-en el FLASH (facturas SAP). Este proceso era completamente manual: comparar
-archivo por archivo, fecha por fecha. La mision es sustituirlo por un flujo
-end-to-end confiable, auditable, operable por una persona no tecnica y cuyo
-entregable final para negocio es un archivo Excel formateado (Fase 6) que el
-equipo de BI usa como fuente para armar sus dashboards en Power BI.
+Experiencia en escalabilidad de automatizacion de procesos: se evita tener
+80 automatizaciones diferentes para procesos similares; se evita parchear
+repetidamente un problema que puede resolverse cambiando el sistema en su
+totalidad.
 
-Compromisos no negociables:
+## Contexto de negocio
 
-- **Cero perdida de datos**: cada fila se contabiliza; si no cruza, va a la
-  tabla `no_cruzados` con motivo. Hash SHA256 del binario original.
-- **Sin LLM en el core**: el matching es 100% deterministico por codigo SAP
-  MATERIAL. Los LLM solo pueden interpretar preguntas del usuario en Copilot
-  Studio, jamas calcular ni decidir KPIs.
-- **Puntos de control humanos explicitos**: nada se persiste sin aprobacion
-  visual de la persona operativa. KPIs marcados como "borrador" hasta
-  validacion de negocio.
+Empresa avicola en Colombia (NutriAvicola, +2000 empleados). El equipo de
+BI cruza tablas de distintas fuentes (Excel, exports SAP, plataformas B2B)
+para medir cumplimiento de ordenes de compra, produccion, etc. Ese cruce
+manual (archivo por archivo, fecha por fecha, key por key) es lento y
+repetitivo.
 
----
+**Lo que ya existe (MVP, 100% funcional):** el flujo PRE CORTE vs FLASH,
+que mide cumplimiento de produccion de huevo. Pipeline deterministico
+FastAPI + SQLite + Angular + n8n + export Excel corporativo. Ver
+[docs/AGENTS_LEGACY.md](docs/AGENTS_LEGACY.md). Su limitacion: es un parche
+mono-proceso. Cada analista del pais tiene archivos con estructuras
+distintas; el MVP solo entiende UNA estructura exacta.
 
-## Modo de operacion clarificado (2026-07-02)
+**Lo que estamos construyendo (proyecto actual):** la plataforma definitiva
+y generica de cruces de datos. Un equipo de agentes LLM (Gemini 2.5 Flash)
+lee los archivos que suba cualquier analista, entrevista al usuario como lo
+haria un analista humano, propone el mapeo completo (estructura, keys,
+transformaciones, KPIs, diseno de reporte) como un contrato JSON llamado
+**MatchProfile**, y un motor deterministico auditable ejecuta el cruce.
+Salidas: base de datos acumulada + Excel corporativo + proyecto Power BI
+(PBIP) con visuales de marca disenadas por nosotros.
 
-**Escenario real:**
+## Compromisos no negociables (heredados y vigentes)
 
-- El usuario tiene **N archivos PRE CORTE** (uno por dia habil de un mes,
-  ejemplo: todo febrero 2026, ~20 archivos).
-- El usuario tiene **UN solo archivo FLASH** que cubre todo el mes.
-- El flujo debe permitir subir en batch los PRE CORTE + subir una sola vez
-  el FLASH, y cruzar cada PRE CORTE con las filas del FLASH correspondientes
-  a su fecha de produccion (fecha del nombre + 1 dia).
+- **Cero perdida de datos**: cada fila se contabiliza; si no cruza, va a
+  `no_cruzados` con motivo. Hash SHA256 del binario original.
+- **LLM propone, nunca calcula**: Gemini interpreta estructura, propone
+  mapeos y KPIs, y conversa con el usuario. El cruce, las agregaciones y
+  los KPIs los ejecuta SIEMPRE el motor deterministico a partir del
+  MatchProfile aprobado. Sin eval libre de formulas: solo operaciones
+  declarativas validadas.
+- **Puntos de control humanos explicitos**: nada se persiste ni se ejecuta
+  sin aprobacion visual del MatchProfile. Preguntas bloqueantes de los
+  agentes detienen la propuesta hasta ser respondidas.
+- **Todo inferido para el usuario** (reforzado por el usuario 2026-07-08):
+  la persona operativa SOLO sube archivos, describe que quiere medir en
+  lenguaje natural y responde preguntas. Nunca configura columnas, hojas,
+  formatos, parametros tecnicos ni rutas. Esto aplica tambien a los
+  entregables: el Excel abre listo, y el PBIP debe cargar datos sin que
+  el usuario entienda parametros de Power Query (instrucciones de 2 pasos
+  maximo). Si un paso requiere conocimiento tecnico, es un bug de diseno.
+- **Principio de entrevista**: los agentes preguntan como personas, no
+  asumen. Mientras analizan, anotan dudas en una cola tipada
+  (`open_questions`). Ejemplos canonicos: detectar el grano de fila
+  ("encontre numeros de orden repetidos en varias filas: cada fila es un
+  producto de la orden y debo agrupar por numero de orden para reconstruir
+  la orden completa?"), keys que se llaman distinto en cada archivo,
+  significado de filas sin key, y solicitud de archivos de homologacion
+  (material/cliente/distrito) cuando existan codigos sin semantica clara.
+  Cada pregunta lleva la hipotesis del
+  agente, el impacto de no responderla y si es bloqueante. Lo respondido
+  se persiste en la memoria del proceso y NUNCA se vuelve a preguntar.
 
-**Implicaciones tecnicas:**
+## Concepto central: MatchProfile
 
-- **Streamlit** debe aceptar `st.file_uploader(..., accept_multiple_files=True)`
-  para los PRE CORTE, y un uploader unico para el FLASH.
-- **FastAPI** expone endpoint `POST /files/upload-batch` que recibe multiples
-  PRE CORTE y guarda cada uno con su hash; y `POST /files/upload-flash` que
-  guarda el FLASH del mes.
-- El **FLASH se carga una vez en memoria y se reutiliza** para todos los
-  PRE CORTE del batch (o bien se persiste en SQLite y se consulta con
-  `WHERE fecha_factura = ?`). En cualquier caso, no se re-parsea N veces.
-- **Un run por PRE CORTE**: cada archivo produce su propio `run_id`, su
-  propio cruce, sus propias filas en `cruce`. El orquestador Power Automate
-  itera sobre la lista de PRE CORTE.
-- **Idempotencia por par**: la unicidad se define por `(pre_corte_hash,
-  flash_hash)`. Si se resube el mismo PRE CORTE con el mismo FLASH, no
-  duplica el cruce (aunque si se sube un nuevo FLASH corregido, se puede
-  reprocesar todo).
-- **Vista mensual**: la salida natural es una tabla mensual (todos los dias
-  del mes) que es exactamente lo que los directivos quieren ver.
+Contrato JSON versionado (Pydantic) que describe UN proceso de cruce
+completo: fuentes y sus loaders (hoja, fila de header, column_map,
+normalizaciones, agrupacion previa por grano), join (keys izquierda/derecha
+con normalizadores), KPIs declarativos con semaforo, y spec del reporte
+(hojas Excel + paginas/visuales Power BI). Los agentes lo proponen, el
+humano lo aprueba (con ediciones), el motor lo ejecuta. El caso PRE CORTE
+vs FLASH se re-expresa como `pre_corte_v1.json` y es el test de regresion
+permanente de la generalizacion.
 
----
+## Equipo de agentes (Gemini 2.5 Flash via Pydantic AI)
+
+| Agente | Rol humano equivalente | Produce |
+|---|---|---|
+| SchemaScout | Ingeniero de datos | Estructura inferida por fuente: hojas, header row, tipos, grano de fila (obligatorio detectarlo), calidad, anomalias |
+| MappingArchitect | Ingeniero ETL | column_map, keys de cruce, normalizaciones, agrupaciones previas |
+| KpiDesigner | Analista de datos | KPIs, formulas declarativas, agregaciones, semaforos |
+| ReportDesigner | Analista BI | Estructura y diseno visual del Excel y del PBIP con marca |
+
+Todos reciben: metadatos + muestras de los archivos, el brief del usuario
+en el chat, y la memoria acumulada del proceso (`profile_knowledge`).
+Todos emiten: fragmento tipado del MatchProfile + `open_questions` +
+score de confianza + justificacion legible.
+
+Privacidad: API Gemini de pago (sin retencion de datos para entrenamiento).
+Por diseno se envian metadatos + muestras; archivo completo solo como
+escalacion explicita.
+
+## Caso de validacion #2: CEN vs SAP (nivel de cumplimiento de entregas)
+
+Proceso real de una analista: las ordenes de compra B2B llegan por la
+plataforma CEN (ej. cadenas de supermercados pidiendo huevo); lo entregado
+queda registrado en SAP. CEN tiene TODAS las ordenes (entregadas o no);
+SAP solo lo facturado/entregado. KPI: nivel de cumplimiento de entregas.
+
+Datos reales en `data_nivel_cumplimiento/` (gitignored, NO commitear):
+
+- **CEN**: `2026/Acumulado CEN P{1..7} 2026.xlsx`. P = periodo (~mes; P1
+  cubre 2026-01-02 a 2026-02-01). Tabla relacional de 30 columnas, header
+  en fila 1. **Grano: fila = linea de producto de la orden** (P1: 10,624
+  filas, 2,619 ordenes unicas; `Numero de la Orden de compra` se repite,
+  ej. `004-0018849`). Columnas clave: `Numero de la Orden de compra`,
+  `Codigo item proveedor` (material SAP, ej. `30049`), `Cantidad Total`,
+  `F. Documento O/C`, fechas min/max/solicitada de entrega. Trampas
+  conocidas: el nombre de la hoja varia (`Hoja2` en P1, `Hoja1` en P2-P7,
+  y P2 trae ademas una hoja pivote `Hoja3` que NO es data), P4 declara
+  1,048,576 filas fantasma (dimension inflada; hay que cortar en la ultima
+  fila real), strings con mojibake (`Ca?averal`).
+- **SAP**: `data meses/{enero..junio}.XLS`. **La extension miente: son
+  xlsx renombrados** (firma PK zip; openpyxl los abre si se copian con
+  extension .xlsx). Hoja `Sheet1`, **sin fila de encabezados** (fila 1
+  vacia), 70 columnas anonimas, ~39,000 filas/mes. Contiene TODAS las
+  ventas, no solo CEN: col 56 trae el numero de orden CEN solo en filas
+  originadas alli; col 40 = codigo material (cruza con `Codigo item
+  proveedor` del CEN); col 41 = descripcion; col 42 = cantidad; col 43 =
+  unidad (UN/PAN); cols 22-23 y 60-61 = fechas; cols 6-7 = canal (PUNTOS
+  PROPIOS, TAT, HARD DISCOUNT...); col 19/57 = clase de documento (ZBVN,
+  ZNTT, ZNAH...).
+- **Cruce esperado** (a confirmar por la entrevista de los agentes, no
+  hardcodear): `Numero de la Orden de compra` del CEN (col 6, con header)
+  <-> col 56 del SAP (posicional, sin header); y a nivel item ademas
+  `Codigo item proveedor` del CEN (col 19) <-> col 40 del SAP. Las keys se
+  llaman distinto (o ni siquiera tienen nombre) en cada archivo: ese es
+  precisamente el problema que la plataforma resuelve. OJO: la col 56 del
+  SAP ademas de ordenes CEN trae pedidos de otros origenes ('261357',
+  '4503551545') y placeholders escritos a mano ('SIN DC', 'SIN ORDEN',
+  'sin oc', '*') - filtrado fino es tema de entrevista.
+- **Semantica de columnas SAP descubierta con datos reales** (2026-07-08,
+  perfil de 8,000 filas de enero): col 6/7 = canal (TAT,
+  SUPERINDEPENDIENTES, PUNTOS PROPIOS, HARD DISCOUNT...); col 10/11 =
+  DISTRITO/regional (NUTRIAVICOLA CALI, TULUA, BOGOTA, IBAGUE...);
+  col 12/13 = tipo de operacion, incluye 'DEVOLUCIONES' (~10% de filas);
+  col 19/57 = clase de documento (ZNAH, ZNTT, ZBVN...); col 24/25 =
+  condicion de pago; col 28/29/30 = CLIENTE (codigo, razon social, NIT);
+  col 31/32 = segmento del cliente (CADENAS, SUPERINDEPENDIENTES1...);
+  col 40/41 = material y descripcion; col 42/43 = cantidad y unidad
+  (UN/PAN/LB); col 44/45 = categoria de huevo (Huevo AA, AAA, Sucio...);
+  col 47-53 = precios/valores COP; col 62/63 = MOTIVO DE RECHAZO/DEVOLUCION
+  ('ROTURA GENERADA EN SUPERMERCADO', 'ROTURA TRANSPORTE-LOGISTICA',
+  'FECHA PROXIMA A VENCER-MERCANCIA'...).
+- **Ventas SIN codigo de orden = canales de venta directa, NO errores**
+  (2026-07-09, verificado sobre junio real, 37,052 filas): ~57% de las
+  filas SAP no tienen numero de orden CEN en col 56 porque son canales que
+  NO pasan por la plataforma CEN, se venden manual/directo. Concentracion
+  por canal (col 7): TAT 99.4% sin codigo (11,001 de 11,064), PUNTOS
+  PROPIOS 99.9% (8,443), EMPLEADOS 99.3%, INSTITUCIONALES 48%, SUPERETES
+  43%. Estas ventas quedan como solo_right (universo right) y son legitimas:
+  reportarlas como "ventas directas por canal", nunca contarlas como
+  faltante de CEN ni como error. SOLO los placeholders de texto escritos a
+  mano ('*', 'SIN DC', 'SIN ORDEN', 1,652 filas) pueden ser errores humanos.
+- **Formatos del numero de orden CEN (col 56) varian; NO filtrar por un
+  unico formato** (2026-07-09): las ordenes CEN reales llegan con guion
+  ('003-0023901') o numericas ('261357', '4241151659'), e incluso con
+  prefijos ('011 OC-009306', 'CT16332727'). Vienen sobre todo de
+  SUPERINDEPENDIENTES (guion+numerico) y CADENAS (numerico). Cruzar por
+  codigo con normalizacion (strip, lstrip_zeros); el outer join descarta lo
+  que no coincide. Filtrar SAP col 56 solo a formato con guion PIERDE ~3,500
+  lineas numericas validas y hunde el nivel de servicio a un falso ~5%
+  (error real cometido y corregido 2026-07-09).
+- **Motivo de rechazo (col 62) aparece en dos contextos** (2026-07-09):
+  (a) en DEVOLUCIONES formales (tipo_operacion=DEVOLUCIONES, col 13; junio:
+  4,965 lineas, ~129k unidades devueltas) y (b) en ventas que NO son
+  devolucion pero traen un motivo operativo (junio: 2,001 lineas: ROTURA,
+  ERROR ALISTAMIENTO, INCUMPLIMIENTO HORARIO...). Reportar AMBOS por
+  separado: "devoluciones por motivo" y "rechazos en ventas (no devolucion)
+  por motivo". El motivo esta en blanco en la gran mayoria de ventas
+  normales (no es un error, simplemente no hubo incidencia).
+- **tipo_operacion (col 13) NO es binaria**: junio trae 'HUEVO EMPACADO'
+  (10,527), 'DEVOLUCIONES' (4,965), 'PUNTO DE VENTA', 'PUNTO VTA RETORN',
+  'PTO VENTA CALI', etc. DEVOLUCIONES es un valor especifico entre muchos;
+  no asumir que "no DEVOLUCIONES" = venta normal a supermercado.
+- **Fechas en el CEN mensual pueden desbordar el mes** (2026-07-09): el
+  Acumulado CEN P6 trae 40 filas de mayo y 24 de julio en 'F. Documento
+  O/C' ademas de junio. El periodo es aproximado; se cruza el archivo
+  completo sin filtrar por fecha, pero los agentes deben RECONOCER y
+  MENCIONAR estos dias de borde al usuario.
+
+**Requisitos de negocio del caso CEN vs SAP** (usuario, 2026-07-08):
+
+1. La salida debe ser data usable y visible como en el MVP pero mejor
+   estructurada y con mas valor de insight (Excel + Power BI + historico
+   en base de datos).
+2. **Nivel de servicio**: cuantos pedidos hay, cuales se entregaron
+   (completos/parciales) y cuales no, expresado EN PORCENTAJE Y EN
+   UNIDADES.
+3. **KPIs de motivos de rechazo/devoluciones**: unidades devueltas y
+   conteo por motivo (col 62 del SAP) y por tipo de operacion DEVOLUCIONES.
+4. **Clasificacion dimensional de los pedidos**: por material, por
+   distrito, por cliente, y por cliente+material.
+5. **Formato final = base de datos en Excel** (aplica al caso CEN y a la
+   mayoria): tablas completamente funcionales y planas (nunca cross-tab),
+   con ids y foreign keys, listas para que el equipo de BI las importe a
+   Power BI via Power Query si quieren modificar algo. ADEMAS se entrega
+   el Power BI ya construido con buena estructura: tablas definidas,
+   medidas, paginas con proposito y cada visual con justificacion. Todo
+   lo propone el ReportDesigner (agente de BI) y lo aprueba el humano.
+
+Soporte en el contrato: `MatchProfile.service_level` (clasificacion
+declarativa completo/parcial/no_entregado por linea y por pedido),
+`MatchProfile.breakdowns` (desgloses por dimensiones con metricas
+declarativas, universos matched/left_full/right_source),
+`MatchProfile.data_model` (fact + dimensiones con ids/FKs, construido por
+`app/platform/data_model.py::build_data_model`) y
+`report.powerbi.measures` + `pages[].proposito` + `visuals[].justificacion`
+(diseno declarativo del tablero, sin DAX libre).
+- Fixtures recortados para tests (estos SI van al repo):
+  `tests/fixtures/cen/Acumulado CEN P7 2026.xlsx` (CEN completo mas
+  liviano) y `tests/fixtures/cen/sap_junio_muestra.xlsx` (600 filas de
+  junio: 400 con orden CEN + 200 sin).
+- Todo se acumula en base de datos (como el historico SQLite del MVP)
+  para tener mayor juego de datos, y luego se renderiza a Excel/Power BI.
+  Que agrupar, como interpretar periodos sin fecha en el nombre, y que
+  renderizar es exactamente lo que el multiagente debe inferir/preguntar,
+  no una regla fija de este documento.
 
 ## Convenciones tecnicas
 
-- Python >= 3.11, `pandas>=2`, `openpyxl`, `fastapi`, `streamlit`, `pytest`.
-- Todo el codigo en `app/`; tests en `tests/`; datos en `data/`; logs en
-  `logs/`; documentacion en `docs/`.
-- Sin emojis en codigo ni comentarios.
-- Sin comentarios que narran obviedades; solo comentarios que explican
-  intencion no obvia, trade-offs o restricciones.
-- Nombres en español para dominio (referencia, notificado, cumplimiento_pct),
-  ingles para infraestructura (`run_id`, `hash_sha256`, `load_pre_corte`).
-- Cada modulo del core es una funcion pura, sin efectos secundarios; los
-  efectos (I/O, DB) viven en `db.py` y `api/routes/`.
+- Python >= 3.11, `pandas>=2`, `openpyxl`, `fastapi`, `pydantic-ai`,
+  `streamlit` no (el frontend es Angular), `pytest`.
+- Codigo de plataforma nueva en `app/platform/` (contrato, loader, motor)
+  y `app/agents/` (capa LLM). El core legado en `app/core/` se generaliza
+  sin romper sus tests (90+ verdes siempre).
+- Nombres en espanol para dominio (cumplimiento_pct, no_cruzados), ingles
+  para infraestructura (profile_id, run_id, hash_sha256).
+- Sin emojis en codigo, comentarios ni docs. Sin comentarios que narran
+  obviedades.
+- Funciones puras en el core; efectos (I/O, DB, LLM) en modulos de borde.
+- Telemetria LLM obligatoria: cada llamada registra tokens, costo,
+  latencia, propuesta original vs aprobada. Alimenta [rubrica.md](rubrica.md).
+- Los agentes constructores (subagentes de este proyecto) actualizan
+  [road.md](road.md) al terminar su bloque y NO cambian tecnologias a
+  mitad de construccion por practicidad o velocidad.
 
----
+## Metodo de analisis generalizable (todo agente debe pensar asi)
+
+Los hechos concretos del caso CEN vs SAP (canal TAT sin orden, motivo en
+col 62, formatos de orden) son INSTANCIAS de principios generales. Ningun
+agente debe memorizar solo el caso: debe interiorizar el metodo para
+reproducir, en archivos nunca vistos, la misma calidad de analisis que un
+analista humano experto. Estos principios viven tambien en el prompt
+compartido `_METODO_ANALISIS` de `app/agents/crew.py` y aplican a los cuatro
+agentes:
+
+1. Verificar, no asumir: toda hipotesis se sostiene con evidencia del dato
+   (distinct_ratio, muestras, conteos, cruce columna-contra-columna); lo no
+   confirmado es `open_question`, no supuesto silencioso.
+2. Las ausencias tienen significado: una key vacia/rara suele ser un
+   subconjunto legitimo (otro canal, venta directa, otro sistema), no un
+   error. Cruzarla contra columnas de contexto (canal, tipo, segmento) para
+   explicarla y reportarla aparte.
+3. Un campo puede tener varios formatos validos: no reducir una key a un
+   unico patron sin evidencia; normalizar y dejar que el join descarte.
+4. Una columna de estado/motivo/flag puede aplicar a varios contextos:
+   separarlos y reportar cada uno.
+5. Los archivos "de un periodo" pueden desbordarlo: detectar filas de borde
+   y decidir con el usuario.
+6. Desconfiar de sumas que no cuadran: totales/subtotales/fantasma inflan
+   agregados; marcar cifras imposibles para el negocio.
+7. El resultado debe ser verificable: KPIs contrastables contra un calculo
+   simple e independiente; un valor absurdo obliga a revisar supuestos antes
+   de proponer.
+8. Pensar en uso empresarial: cada tabla/visual responde una pregunta de
+   negocio y es legible por una persona no tecnica.
+
+Cuando un agente humano (o el orquestador) descubra un patron nuevo
+generalizable, debe anadirlo aqui y al prompt compartido, no dejarlo como
+conocimiento de un solo caso.
 
 ## Que evitar
 
-- Usar LLM para el matching de categorias. El codigo SAP `MATERIAL` (con o
-  sin padding de ceros) es la clave deterministica.
-- Modificar formulas o umbrales de KPIs sin confirmacion explicita del
-  negocio.
-- Escribir en SQLite sin la aprobacion humana visual en Streamlit.
-- Reprocesar el mismo par `(pre_corte_hash, flash_hash)` sin advertir al
-  usuario.
-- Refactor grandes al notebook `test.ipynb`: se mantiene como sandbox de
-  exploracion; toda la logica productiva vive en `app/core/`.
-
----
-
-## Estado de fases
-
-- [x] **Fase 0** - Fix del bug de fecha en `test.ipynb` (2026-02-13 -> 14).
-- [x] **Fase 1** - Core Python: `date_extractor`, `loaders`, `aggregator`, `matcher`.
-- [x] **Fase 2** - Validadores anti-perdida + logging rotativo.
-- [x] **Fase 3** - Historico SQLite acumulado con idempotencia (batch N vs 1).
-- [x] **Fase 4** - Backend FastAPI con endpoints atomicos (2026-07-02).
-- [x] **Fase 4.5** - Migracion PRE CORTE de NOTIFICACION a RESUMEN + catalogo
-  SKU (2026-07-02).
-- [ ] **Fase 5** - Streamlit UI + embed Copilot Studio.
-- [x] **Fase 6** - Export a Excel formateado para el equipo de BI (KPI unico:
-  cumplimiento %, en 3 niveles de granularidad) (2026-07-06).
-- [x] **Fase 6.6** - Calendario laboral colombiano: `fecha_produccion` salta
-  al proximo dia habil si cae en domingo o festivo (2026-07-06).
-- [x] **Fase 6.5** - Excel multi-fecha: agrupacion visual de fechas, hoja
-  `Por_Semana`, generacion de N dailies + consolidado + zip (2026-07-06).
-- [x] **Fase 7A** - Modelo Batch + endpoints CRUD + preview + generate +
-  downloads. Detecta colisiones. Valida periodo del flash. Acepta ZIP.
-  (2026-07-06).
-- [x] **Fase 7B** - Dockerize + Railway ready: Dockerfile multi-stage
-  non-root, `railway.json`, config con env vars (`NUTRI_DATA_DIR`,
-  `PORT`, `NUTRI_CORS_ORIGINS`, `SUPABASE_*`), storage_adapter (Local +
-  Supabase), tests, docs de deploy (2026-07-06).
-- [x] **Fase 7C** - Frontend Angular 22 en `frontend/` con Material 3 y
-  paleta corporativa NutriAvicola. 4 componentes lazy-loaded (dashboard,
-  wizard de 5 pasos, detail, downloads). `BatchesService` cablea todos
-  los endpoints. Build production OK (100 KB gzip inicial), E2E manual
-  contra backend local validado. Config Vercel lista (2026-07-06).
-- [x] **Fase 7D** - n8n workflow importable (`n8n/n8n_workflow_match_batch.json`)
-  + docs de deploy en Railway. Backend expone todo lo necesario; n8n solo
-  llama endpoints en secuencia y notifica (2026-07-06).
-- [x] **Fase 7E** - StorageAdapter cableado en `generate_batch`: mirror
- automatico de outputs al bucket Supabase cuando `SUPABASE_URL +
- SUPABASE_SERVICE_KEY` estan definidas. `download_file` retorna 307
- Redirect a signed URL. Fallback silencioso a disco local si Supabase
- falla. 2 tests con fake storage (2026-07-06).
-- [x] **Fase 7C.1** - Fix pagina en blanco Vercel + local (2026-07-06):
- (a) `environment.prod.ts` faltaba el esquema `https://` en `apiBaseUrl`,
- lo que provocaba que HttpClient tratara la URL como path relativo y
- pegara al propio Vercel devolviendo `index.html` en vez de JSON;
- (b) `vercel.json` con `rewrites: [{ source: "/(.*)", ... }]` capturaba
- tambien los bundles `main-*.js` y `styles-*.css` cuando el navegador
- pedia un hash viejo (post-redeploy), rompiendo la app con
- `SyntaxError: Unexpected token '<'`. Nueva regex excluye `assets/` y
- cualquier ruta con extension. Agregamos `Cache-Control: no-cache` sobre
- `index.html` para evitar el cache de hashes zombies; y
- `max-age=31536000, immutable` sobre los hashed assets; (c) `app.html`
- usaba `src="assets/logo.jpg"` (relativo), que se rompia en rutas
- anidadas tipo `/batches/nuevo/assets/logo.jpg`; ahora usa
- `/assets/logo.jpg` (absoluto); (d) el preview URL
- `cumplimientoplataforma-<hash>-byzocars-projects.vercel.app` sirve la
- pagina de login de Vercel (Deployment Protection activa por default),
- no la SPA. Usar el dominio de produccion o desactivar la proteccion en
- Vercel dashboard. Troubleshooting completo en
- [docs/deploy_vercel.md](docs/deploy_vercel.md#troubleshooting-pagina-en-blanco).
-- [x] **Fase 7C.2** - Rediseno visual corporativo NutriAvicola (2026-07-06):
- sistema de design tokens explicitos + refactor de los 5 componentes.
- Anti-glass total (sin backdrop-filter, sin transparencias). Detalle en
- la seccion "Fase 7C.2 - Rediseno visual corporativo (2026-07-06)".
----
-
-## Fase 4 - resumen de lo entregado (2026-07-02)
-
-**API endpoint tree:** 21 endpoints, Swagger en `http://127.0.0.1:8000/docs`.
-
-```
-/health                                      GET
-/files/upload-pre-corte                      POST   (multipart, single, xlsx obligatorio)
-/files/upload-pre-corte-batch                POST   (multipart, multiple)
-/files/upload-flash                          POST   (multipart, xlsx o csv)
-/runs                                        GET    (list recientes)
-/runs/start-batch                            POST   (crea master + N sub-runs)
-/runs/{run_id}                               GET
-/runs/{run_id}/sub-runs                      GET
-/runs/{run_id}/approve                       POST
-/runs/{run_id}/reject                        POST
-/pipeline/{run_id}/extract-date              POST
-/pipeline/{run_id}/load-pre-corte            POST
-/pipeline/{run_id}/load-flash                POST
-/pipeline/{run_id}/aggregate                 POST
-/pipeline/{run_id}/match                     POST
-/pipeline/{run_id}/validate                  POST   (setea status awaiting_approval)
-/pipeline/{run_id}/kpis-preview              POST   (deprecado; reemplazado por /kpis/excel)
-/pipeline/{run_id}/persist                   POST   (requiere status=approved)
-/catalog                                     GET    (lista + stats del catalogo SKU)
-/catalog/manual-mapping                      POST   (registra un SAP manualmente)
-/catalog/import-homologacion                 POST   (recarga homologacion .xlsx)
-/kpis/excel                                  GET    (Fase 6: descarga .xlsx formateado, ?desde=&hasta=)
-/calendario/no-laborales                     GET    (Fase 6.6: festivos oficiales, ?year=Y)
-/batches                                     POST   (Fase 7A: crea batch draft)
-/batches                                     GET    (lista batches)
-/batches/{id}                                GET    (detalle: pre_cortes + flash + status)
-/batches/{id}                                PATCH  (renombrar / notas)
-/batches/{id}                                DELETE (solo draft/archived/failed)
-/batches/{id}/archive                        POST   (soft delete)
-/batches/{id}/pre-cortes                     POST   (multipart: 1..N pre_cortes)
-/batches/{id}/pre-cortes/from-zip            POST   (multipart zip, filtra por regex)
-/batches/{id}/pre-cortes/{carga_id}          DELETE
-/batches/{id}/flash                          POST   (multipart + query year,month)
-/batches/{id}/flash                          DELETE
-/batches/{id}/preview                        GET    (JSON: dias, colisiones, saltos, flash_ok)
-/batches/{id}/confirm                        POST   (draft -> ready_to_match, bloquea si colisiones)
-/batches/{id}/generate                       POST   (persist runs + genera excels + zip)
-/batches/{id}/downloads                      GET    (lista archivos generados)
-/batches/{id}/downloads/{filename}           GET    (stream FileResponse)
-```
-
-**Cache local:** `data/uploads/{carga_id}.{ext}` (fuente original) +
-`data/uploads/{carga_id}.pkl` (DataFrame parseado). Cada endpoint del pipeline
-lee del pickle -> no re-parsea el xlsx.
-
-**Levantar el server:** `run_backend.bat` (usa uvicorn con reload).
-
-**Tests:** 90/90 tests OK. `tests/test_api.py` cubre happy path completo,
-idempotencia, batch multi-pre-corte, errores 404/409/415/422, y endpoints
-del catalogo. `tests/test_resumen_parser.py` verifica que el parser del
-RESUMEN preserva las 18 filas no-cero y el total 299,416 unidades del fixture.
-`tests/test_sku_catalog.py` cubre upsert, prioridad por fuente, alias de
-formato y aprendizaje via pair-learn.
-
-**Contrato para Power Automate:** cada endpoint es HTTP JSON simple; el
-orquestador solo hace POST secuenciales y toma decisiones sobre el `status`
-del run que retorna `/runs/{run_id}`.
-
----
-
-## Fase 4.5 - Migracion PRE CORTE de NOTIFICACION a RESUMEN (2026-07-02)
-
-### Que cambio y por que
-
-La hoja NOTIFICACION del PRE CORTE es notificacion de bodega, NO el plan de
-produccion. La hoja **RESUMEN** contiene el plan real de comercializacion
-(bandejas por REFERENCIA/TIPO/FORMATO/UNIDADES). Antes se cargaba
-NOTIFICACION como fuente autoritativa, produciendo cifras que no coincidian
-con lo planificado por comercializacion.
-
-### Reglas nuevas de intake
-
-- **PRE CORTE debe llegar como `.xlsx` (o `.xlsm`)**. El CSV/TSV destruyen
-  los merged cells del RESUMEN (columna REFERENCIA queda vacia en 4 de 5
-  filas de cada bloque). El endpoint `POST /files/upload-pre-corte` devuelve
-  `415 Unsupported Media Type` si recibe otro formato.
-- **RESUMEN es la fuente autoritativa** (parseado con `openpyxl`, no pandas).
-- **NOTIFICACION es opcional**. Si viene en el mismo `.xlsx`, se usa para
-  aprendizaje del catalogo (pair-learn) y validacion cruzada de totales.
-
-### Puente SAP: catalogo persistente `sku_catalog`
-
-Nueva tabla en `data/historico.sqlite`:
-
-```sql
-CREATE TABLE sku_catalog (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    referencia TEXT NOT NULL,
-    tipo TEXT NOT NULL,
-    formato TEXT NOT NULL,
-    unidades_por_empaque INTEGER NOT NULL,
-    material_sap INTEGER NOT NULL,
-    nombre_notificacion TEXT,
-    fuente TEXT NOT NULL DEFAULT 'aprendido',
-    primera_vez_visto TIMESTAMP,
-    ultima_vez_visto TIMESTAMP,
-    veces_visto INTEGER NOT NULL DEFAULT 1,
-    UNIQUE(referencia, tipo, formato, unidades_por_empaque)
-);
-```
-
-**Prioridad de fuentes al haber conflicto:**
-`manual` (3) > `aprendido_pair` (2) > `homologacion` (1).
-
-**Aliases de FORMATO** (RESUMEN <-> homologacion externa):
-`ESTUCHE <-> ESTUCHERIA`, `VITAFILM <-> TERMOENCOGIDO`.
-
-### Como se puebla el catalogo (3 mecanismos)
-
-1. **Import inicial** desde `homologacion materiales Nuevo.xlsx` (hojas
-   `Hoja2 (2)` y `Ata`):
-   `python -m app.core.sku_catalog --import-homologacion <path>`
-   o `POST /catalog/import-homologacion`. Solo inserta tuplas no ambiguas
-   (skip si la misma REFERENCIA/TIPO/FORMATO/UNIDADES apunta a >1 SAP).
-
-2. **Aprendizaje automatico** al procesar cada PRE CORTE con NOTIFICACION:
-   `update_catalog_from_pair(conn, resumen_df, notif_df)` aparea celdas
-   por `bandejas == necesidad_bandeja` y unidades. Sobrescribe entradas
-   de `homologacion` si tenian el SAP incorrecto.
-
-3. **Mapeo manual** para SKUs que ni la homologacion ni el aprendizaje
-   pudieron resolver: `POST /catalog/manual-mapping` (prioridad maxima).
-
-### Modulos nuevos y renombrados
-
-- `app/core/resumen_parser.py`: `load_resumen(path) -> (df_long, meta)`.
-- `app/core/sku_catalog.py`: `import_from_homologacion`,
-  `update_catalog_from_pair`, `resolve_sap`, `attach_sap_to_resumen`,
-  `upsert_entry`, `list_catalog`, `catalog_stats`, CLI con `--stats`,
-  `--list`, `--import-homologacion`, `--backfill`.
-- `app/core/loaders.py`: `load_pre_corte` reescrito para orquestar
-  RESUMEN + NOTIFICACION opcional + catalogo; nuevo `load_notificacion`.
-- `app/core/validators.py`: `validate_resumen_total_preserved`,
-  `validate_resumen_vs_notificacion`, `validate_catalog_coverage`
-  reemplazan al viejo `validate_sum_preserved(NOTIFICADO)`.
-- `app/api/routes/catalog.py`: endpoints `/catalog`, `/catalog/manual-mapping`,
-  `/catalog/import-homologacion`.
-- `app/api/schemas.py`: `CatalogEntry`, `CatalogListResponse`,
-  `ManualMappingRequest/Response`. `FileUploadResponse` amplia con
-  `notificacion_presente`, `num_filas_sin_sap`, `catalog_coverage_pct`,
-  `pair_learn_stats`.
-
-### Resultado verificado sobre el fixture
-
-`tests/fixtures/PRE_CORTE_muestra.xlsx` (PRE CORTE 13.02.2026 real):
-- 18 filas no-cero en RESUMEN, suma total 299,416 unidades.
-- Con `homologacion.xlsx` importado + pair-learn: **100% cobertura SAP**
-  (0 filas en `no_cruzados` por catalogo faltante).
-- Ambiguidad de homologacion resuelta correctamente por pair-learn (ej:
-  MARCA ORO/A/AMARRADO/30 tenia 3 candidatos en la homologacion; el
-  pair-learn con NOTIFICACION resolvio a 30040, no a 30030).
-
----
-
-## Fase 6.6 - Calendario laboral colombiano (2026-07-06)
-
-**Regla nueva**: `fecha_produccion = siguiente_dia_habil(fecha_archivo + 1)`.
-
-Si el dia siguiente al archivo es domingo o festivo colombiano oficial, la
-fecha de produccion se desplaza al proximo dia habil. Puede saltar varios
-dias si hay festivos encadenados (ej. sabado -> domingo + festivo lunes ->
-martes). Esto evita cruzar contra un FLASH inexistente (no hay ventas los
-domingos/festivos) y no contamina el KPI de cumplimiento.
-
-**Fuente de festivos**: CSV estatico
-`resources/festivos_colombia_2024_2030.csv`, generado offline por
-`scripts/generar_calendario.py` con la libreria `holidays` (dev-only,
-`requirements-dev.txt`). **Sin LLM**: los festivos son deterministicos, no
-requieren razonamiento. **Sin API externa**: el CSV se carga en memoria al
-importar `app.core.calendario`, lookups O(1).
-
-**Que se excluye del CSV**: "Dia de Nuestra Senora del Rosario de
-Chiquinquira" (13 julio observado). No es festivo laboral segun Ley
-51/1983 aunque la libreria `holidays` lo incluya. Documentado en la
-constante `EXCLUIR_MOTIVOS` de [scripts/generar_calendario.py](scripts/generar_calendario.py).
-
-**Nuevos modulos y endpoints**:
-
-- [app/core/calendario.py](app/core/calendario.py): `is_no_laboral`,
-  `motivo_no_laboral`, `siguiente_dia_habil`, `dias_habiles`,
-  `festivos_del_ano`, con excepcion `CalendarioSinCobertura` para fechas
-  fuera del rango.
-- [app/core/date_extractor.py](app/core/date_extractor.py):
-  `extract_production_date_verbose` retorna `(fecha, dias_saltados,
-  motivos_saltados)`. El endpoint de upload propaga estos campos.
-- [app/api/routes/calendario.py](app/api/routes/calendario.py):
-  `GET /calendario/no-laborales?year=Y` -> lista de festivos oficiales del
-  ano (para el mini-calendario del frontend).
-- `FileUploadResponse` extendido con `dias_saltados` y `motivos_saltados`.
-
-**Regenerar el CSV**: cuando el Gobierno anada/quite un festivo o para
-extender el rango de anios, correr `python scripts/generar_calendario.py`
-y commitear el diff. Auditable en el repo.
-
-**Tests** (`tests/test_calendario.py` + extensiones a
-`tests/test_date_extractor.py` + `tests/test_api.py`):
-
-- Sabado 07/02/2026 -> lunes 09/02/2026 (`dias_saltados=1`).
-- Domingo 11/01/2026 + lunes 12/01/2026 (Reyes trasladado) -> martes
-  13/01/2026 (`dias_saltados=2`).
-- Pascua 2026: Jueves Santo 02/04, Viernes Santo 03/04, Domingo
-  Resurreccion 05/04, salta a lunes 06/04 desde Jueves Santo.
-- Chiquinquira NO figura como festivo en el CSV.
-- `GET /calendario/no-laborales?year=2026` retorna ~18 festivos oficiales.
-- El fixture existente (viernes 13/02 -> sabado 14/02) sigue verde porque
-  el sabado es laboral.
-
----
-
-## Fase 6 - Contrato de salida (clarificado 2026-07-06)
-
-**El entregable final NO es una conexion a Power BI**. Es **un archivo `.xlsx`
-bien formateado** que el equipo de BI descarga y usa como fuente para armar
-sus dashboards por su cuenta. Nada de ODBC, nada de DirectQuery.
-
-### KPI unico
-
-**Cumplimiento %** = `unidades_reales_flash / unidades_plan_resumen * 100`.
-
-Nada de "top desviaciones", "alertas", "fugas por marca", etc. hasta que
-negocio pida mas. **Un solo KPI**.
-
-### Batch multi-fecha (Fase 6.5, 2026-07-06)
-
-Cuando el usuario sube N pre_cortes del mes contra UN flash mensual, el
-sistema produce:
-
-- **N archivos daily** `cumplimiento_YYYYMMDD.xlsx`, uno por cada fecha de
-  produccion con datos. Cada daily lleva Portada + Resumen (1 fila) +
-  Por_Categoria + Detalle_Material + No_Cruzados. Sin hoja Por_Semana
-  (no aporta para un solo dia).
-- **1 consolidado** `cumplimiento_consolidado_YYYYMMDD_YYYYMMDD.xlsx` que
-  agrega ademas la hoja **`Por_Semana`** (una fila por semana ISO con
-  cumplimiento agregado + total al pie), y agrupa visualmente la fecha
-  en `Por_Categoria`, `Detalle_Material`, `No_Cruzados`.
-- **1 ZIP** `cumplimiento_batch_YYYYMMDD_YYYYMMDD.zip` con el consolidado
-  + todos los dailies.
-
-**Agrupacion visual de fechas** (soluciona el "14/02/2026 repetido 150
-veces"): `write_dataframe_as_table(group_by_key="fecha_produccion")` muestra
-la fecha solo en la primera fila del grupo y aplica un borde medium naranja
-sobre todas las celdas al cambio de grupo. **No usa merge de celdas**, asi
-el ListObject de Excel sigue soportando filtros y ordenamiento sin romper.
-
-**API publica de exporters.py**:
-- `export_cumplimiento_xlsx(desde, hasta, dest, ...)`: consolidado.
-- `export_cumplimiento_diario(fecha, dest, ...)`: alias de conveniencia
-  para un dia unico.
-- `export_batch_completo(desde, hasta, output_dir, ...)`: paquete completo,
-  retorna dict con `consolidado`, `dailies`, `zip`, `fechas_procesadas`,
-  `fechas_sin_datos_en_rango`.
-- `suggested_daily_filename(fecha)`, `suggested_consolidado_filename(desde,
-  hasta)`, `suggested_zip_filename(desde, hasta)`.
-
-Demo end-to-end multi-fecha:
-`venv\Scripts\python.exe _demo_export.py` -> genera batch con 6 dailies +
-consolidado + zip (~185 KB) desde el fixture real.
-
----
-
-## Fase 7A - Modelo Batch (2026-07-06)
-
-Un `batch` es el envelope que agrupa **N pre_cortes diarios + 1 flash
-mensual en staging** antes de disparar el match. Reemplaza el "master run"
-del schema previo. Es la unidad principal con la que interactuan el
-frontend (Fase 7C) y el orquestador (Fase 7D).
-
-**Estados** (`app/core/batches.py::BatchStatus`):
-
-`draft` -> `ready_to_match` -> `matching` -> `matched` (feliz)
-                                          -> `failed`
-                                          -> `archived` (soft delete desde
-                                             cualquier estado terminal)
-
-Solo `draft` permite CRUD (agregar/quitar pre_cortes, cambiar flash,
-renombrar). `ready_to_match` es el punto de checkpoint humano; el frontend
-llama `confirm` cuando el usuario aprueba el preview.
-
-**Regla clave de negocio: colisiones**. Con la Fase 6.6 (skip a dia habil),
-dos pre_cortes distintos pueden resolver al mismo `fecha_produccion`
-(ej. si por error se sube el pre_corte del domingo). El endpoint
-`GET /batches/{id}/preview` retorna un array `colisiones: [{fecha,
-pre_corte_carga_ids: [...]}]` y `POST /batches/{id}/confirm` responde 409
-si hay colisiones sin resolver. El usuario debe eliminar el duplicado con
-`DELETE /batches/{id}/pre-cortes/{id}` antes de continuar.
-
-**Regla clave del flash: periodo declarado**. `POST /batches/{id}/flash`
-requiere `year` y `month` como query params. La API valida que el flash
-contenga facturas de ese periodo (via `validar_flash_periodo` que revisa
-`fecha_factura` del df parseado). Retorna 422 si no cuadra, con mensaje que
-incluye el rango real del archivo. Este endpoint es lo que reemplaza a la
-extraccion automatica (el flash no tiene fecha en el nombre).
-
-**ZIP upload**: `POST /batches/{id}/pre-cortes/from-zip` acepta un `.zip`
-con multiples pre_cortes. Filtra por `FILENAME_PRE_CORTE_REGEX` y retorna
-`{procesados, ignorados: [{filename, motivo}]}`. Los archivos ignorados
-incluyen: extension no permitida, nombre no matchea el regex, error al
-parsear, etc. Nunca falla la request completa por un archivo malo.
-
-**Generate**: `POST /batches/{id}/generate` (idempotente por UNIQUE en
-tabla `cruce`) itera sobre los pre_cortes del batch, ejecuta `match_by_material`
-contra el flash, persiste via `persist_run`, y llama a
-`export_batch_completo` para producir N dailies + 1 consolidado + 1 zip en
-`data/onedrive_export/batch_{id}/`. Cambia el estado a `matched` y guarda
-`output_dir`. Si falla, marca `failed`.
-
-**Downloads**: `GET /batches/{id}/downloads` lista los archivos con
-`{filename, size_bytes, kind}` donde `kind` es `consolidado | daily | zip`.
-`GET /batches/{id}/downloads/{filename}` sirve el archivo via
-`FileResponse` con proteccion contra path traversal.
-
-**Tests**: 20 en `tests/test_batches.py` cubriendo CRUD, ZIP mixto,
-colisiones (sabado 07 + domingo 08 -> ambos apuntan a lunes 09),
-validacion de mes del flash, preview con saltos, confirm bloqueado por
-colisiones, flujo E2E completo, path traversal bloqueado.
-
----
-
-## Fase 7B - Docker + Railway ready (2026-07-06)
-
-**Archivos nuevos en el root**:
-- [Dockerfile](Dockerfile) — multi-stage `python:3.14-slim-bookworm`,
-  non-root user `nutri`, `HEALTHCHECK` contra `/health`, `EXPOSE 8000`,
-  `PATH` incluye `/home/nutri/.local/bin` para uvicorn.
-- [.dockerignore](.dockerignore) — excluye `tests/`, `data/`, `venv/`,
-  `.git/`, `.env`, docs, cursor metadata.
-- [railway.json](railway.json) — `DOCKERFILE` builder, healthcheck
-  `/health` timeout 30 s, restart `ON_FAILURE` max 3.
-- [.gitignore](.gitignore) — bloquea `data/*.sqlite*`, `data/uploads/`,
-  `data/onedrive_export/`, `.env*`, `.venv/`, `.cursor/`.
-- [.env.example](.env.example) — template de env vars documentado.
-- [requirements.txt](requirements.txt) — deps runtime (Pillow + supabase
-  agregadas). Pytest y holidays movidos a `requirements-dev.txt`.
-- [scripts/setup_supabase.py](scripts/setup_supabase.py) — crea buckets
-  `uploads`/`outputs` privados. Idempotente. Requiere SECRET key.
-- [app/core/storage_adapter.py](app/core/storage_adapter.py) — `Storage`
-  Protocol + `LocalStorage` (default) + `SupabaseStorage` (activado por
-  env vars). Factory `get_storage()` singleton. Path traversal
-  protection en LocalStorage.
-- [docs/deploy_railway.md](docs/deploy_railway.md) — guia paso a paso
-  (crear proyecto, volumen /data, env vars, healthcheck, Supabase,
-  smoke build local, rotacion de credenciales, troubleshooting).
-
-**Cambios en [app/config.py](app/config.py)**:
-- Todas las rutas configurables por env: `NUTRI_DATA_DIR`, `NUTRI_LOGS_DIR`.
-- `PORT` de Railway respetado (fallback a `NUTRI_API_PORT` local).
-- `NUTRI_CORS_ORIGINS` parseado de CSV.
-- Nuevo `storage_backend_activo()` -> `"supabase" | "local"`.
-- Cargador `.env` minimo sin dep externa; se salta en pytest.
-
-**Estado de las env vars**:
-
-| Variable                    | Default local        | Railway prod                    |
-|-----------------------------|----------------------|---------------------------------|
-| `NUTRI_DATA_DIR`            | `<repo>/data`        | `/data` (volumen persistente)   |
-| `NUTRI_LOGS_DIR`            | `<repo>/logs`        | `/data/logs`                    |
-| `NUTRI_API_HOST`            | `127.0.0.1`          | `0.0.0.0`                       |
-| `PORT`                      | (no aplica)          | inyectada por Railway           |
-| `NUTRI_API_PORT`            | `8000`               | ignorada (usa `PORT`)           |
-| `NUTRI_CORS_ORIGINS`        | localhost dev        | dominio Vercel + previews       |
-| `SUPABASE_URL`              | del `.env` opcional  | de Railway UI                   |
-| `SUPABASE_SERVICE_KEY`      | del `.env` opcional  | de Railway UI (SECRET, no anon) |
-| `SUPABASE_BUCKET_UPLOADS`   | `uploads`            | `uploads`                       |
-| `SUPABASE_BUCKET_OUTPUTS`   | `outputs`            | `outputs`                       |
-
-**Tests nuevos (17)**:
-- `tests/test_config.py` (7): default data_dir, override por env, PORT
-  de Railway, CORS parsing, storage backend local/supabase.
-- `tests/test_storage_adapter.py` (10): protocol compliance, round-trip
-  put/get/delete/exists/list, `public_url` file URI, path traversal
-  bloqueado, `SupabaseStorage` requiere creds y libreria, factory
-  singleton.
-
-**Notas de seguridad**:
-- `.env` local con las credenciales Supabase compartidas por el usuario
-  esta en el repo pero excluido por `.gitignore`.
-- La key que el usuario compartio es **publishable** (`sb_publishable_...`),
-  no permite writes a buckets privados. Para Fase 7E se necesita la
-  **secret** (`sb_secret_...`).
-- Rotar credenciales al cerrar el proyecto (checklist en
-  [docs/deploy_railway.md](docs/deploy_railway.md#rotacion-de-credenciales)).
-
-**Pendiente para 7E**: cablear los endpoints de upload/download del router
-`batches.py` para que ademas de escribir localmente escriban al
-`StorageAdapter.get()`. Con `LocalStorage` es no-op. Con `SupabaseStorage`
-los blobs viajan a Supabase y las descargas usan signed URLs.
-
----
-
-## Fase 7C.2 - Rediseno visual corporativo (2026-07-06)
-
-**Contexto:** el rediseno anterior (Fase 7C base) era funcional pero
-visualmente pobre: inline styles por todos lados, hex hardcodeados en
-componentes, badges reutilizados como alerts, KPIs sin jerarquia visual,
-tablas planas. El logo NutriAvicola (naranja "N" + texto navy) se veia
-apagado directamente sobre el toolbar navy. La app funcionaba pero no
-transmitia "software empresarial serio".
-
-**Filosofia visual:** sobria, corporativa, B2B. Referencias mentales:
-Salesforce Lightning, Vercel Dashboard (sin la parte glass), reportes
-Deloitte, Bloomberg Terminal moderna. Superficies solidas, bordes 1px,
-elevacion sutil, radios moderados (4-8 px), naranja como acento
-puntual (nunca dominante). El semaforo verde/amarillo/rojo queda
-reservado para KPIs de cumplimiento.
-
-### Restricciones duras que respetamos
-
-- **Anti-glass**: cero `backdrop-filter: blur(...)`, cero fondos
- semi-transparentes tipo `rgba(_,_,_, 0.x)` a nivel de componente.
- Las unicas transparencias son para el hover state layer del toolbar
- (rgba blanco sobre navy) que es intencional para no romper Material.
-- **Logo bien contrastado**: el logo va dentro de un chip blanco
- (`.nutri-brand__logo-wrap`) con `background: #FFFFFF` y radius 6 px,
- anclado en la esquina izquierda del toolbar. Asi el naranja de la
- "N" y el navy del texto se leen perfectamente.
-- **Paleta corporativa**: navy `#0F2E4C` y naranja `#E87722` como
- nucleos; el resto son shades derivados (50/100/200/300/400/500/600/
- 700/800/900 para navy, orange y gray).
-- **Sin dependencies nuevas**: solo CSS + Material Angular existente.
- Sin framer-motion, sin gsap, sin fuentes Google externas (Roboto ya
- viene con Material 3 y se sirve como está en `<head>` — no se agrego
- nada nuevo).
-
-### Design tokens agregados
-
-Todos en [frontend/src/styles.scss](frontend/src/styles.scss) como CSS
-custom properties, accesibles desde cualquier componente sin `@import`:
-
-**Paleta ampliada (10 shades por familia)**:
-- `--nutri-navy-{50..900}` — 10 shades del navy corporativo.
-- `--nutri-orange-{50..900}` — 10 shades del naranja acento.
-- `--nutri-gray-{25,50,100..900}` — 11 shades neutros.
-- `--nutri-sem-{good,warn,bad,info}-{solid,bg,fg,border}` — 4 variantes
- por semaforo (semaphore) para poder usar en badges, alerts, tablas.
-
-**Spacing (escala 4 px)**: `--space-1` (4px) .. `--space-16` (64px), con
-`--space-{1,2,3,4,5,6,7,8,10,12,16}`.
-
-**Typography**: `--fs-xs` (12) .. `--fs-3xl` (32) con line-heights
-`--lh-{tight,snug,normal,loose}` y pesos `--fw-{regular,medium,semibold,bold}`.
-
-**Radios**: `--radius-xs` (3), `--radius-sm` (4), `--radius-md` (6),
-`--radius-lg` (8), `--radius-xl` (12), `--radius-pill` (999). Ningun
-elemento > 12 px salvo pills de status.
-
-**Elevacion (5 niveles)**: `--elev-1` .. `--elev-5` con sombras tintadas
-al navy corporativo (`rgba(15, 46, 76, .06)` etc.), para evitar sombras
-grises frias que rompen la cohesion cromatica.
-
-**Motion**: `--dur-{fast,normal,slow}` (100/150/250 ms) +
-`--ease-standard`, `--ease-emph` (cubic-bezier). Transiciones solo en
-hover de botones/cards, cambios de estado del stepper.
-
-**Superficies semanticas**: `--nutri-bg-{app,surface,subtle,emphasis,
-emphasis-2}`, `--nutri-text-{primary,secondary,muted,on-emphasis,brand}`,
-`--nutri-border-{default,strong,brand,accent}`.
-
-**Compat legacy**: los tokens antiguos (`--nutri-navy`, `--nutri-orange`,
-`--nutri-good`, etc.) siguen expuestos como aliases del nuevo sistema
-para no romper ningun consumidor externo.
-
-### Utilitarias refactorizadas / nuevas
-
-- `.nutri-page` — contenedor centrado, ancho maximo 1280 px, padding
- `--space-8` vertical + `--space-6` horizontal.
-- `.nutri-page-header` (nueva) — con sub-elementos `__title`,
- `__subtitle`, `__actions` para header consistente en las 4 rutas.
-- `.nutri-eyebrow` (nueva) — kicker en mayusculas encima del titulo.
-- `.nutri-card` — superficie solida, borde 1px gray-200, radius 8, sombra
- sutil elev-1. Sin transparencias. Variantes: `--flush`, `--tight`,
- `--featured` (con banda lateral naranja para acciones destacadas).
-- `.nutri-card-header` (nueva) — layout titulo + acciones inline.
-- `.nutri-toolbar` — altura fija 64 px, padding horizontal, borde inferior
- navy-700, sombra elev-2.
-- `.nutri-brand` (nueva) — logo chip blanco + titulo con eyebrow
- (`NutriAvicola BI` + `Cumplimiento PRE CORTE vs FLASH`).
-- `.nutri-nav` + `.nutri-nav-separator` (nuevas) — barra de navegacion
- en la toolbar con separador vertical.
-- `.nutri-badge` — sin cambio de API, pero refactorizado a variantes
- soft (fondo suave + border) coherentes con la nueva paleta semaforo.
-- `.nutri-status` — chip pill con dot indicator (::before) para el
- status del batch, colores derivados del semaforo semaforo semantico.
-- `.nutri-alert` (nueva) — banner full-width con icono + titulo + body,
- border-left de 3 px, variantes `good/warn/bad/info`. Reemplaza el hack
- de "badge con display:block" del wizard.
-- `.nutri-kpi` (nueva) + `.nutri-kpi-grid` — card KPI con icono a la
- izquierda (chip 44x44), label uppercase, valor 28 px negrita, hint.
- Variantes `--brand`, `--accent`, `--warn`, `--good`, `--muted`.
-- `.nutri-table` + `.nutri-table-wrap` (nuevo wrap) — tablas con
- headers navy-500 (uppercase 12 px), banded rows (`--nutri-gray-25`),
- hover state (`--nutri-navy-50`), radios en las esquinas y borde
- exterior via el wrap.
-- `.nutri-empty` (nueva) + `.nutri-loading` (nueva) — patrones de
- estado consistentes con icono + titulo + body.
-- `.nutri-actions` (nueva) — grupo de botones con variantes `--end`,
- `--between` y `.nutri-actions-divider` para hacer flex-grow.
-
-### Componentes rediseñados
-
-- **`app.html` / `app.scss`** — Toolbar con logo blanco anclado
- correctamente, brand con titulo + subtitulo en dos lineas, nav con
- separador vertical y estado activo claro.
-- **`dashboard.component.*`** — Header con eyebrow, 4 KPI cards
- (`brand`/`muted`/`warn`/`good`) con iconos Material distintivos,
- empty state con CTA para crear el primer batch, tabla con
- `nutri-table-wrap` (radius uniforme, hover row).
-- **`batch-wizard.component.*`** — Wizard con `.wizard-step` que
- estructura cada paso en head (titulo + descripcion) / body (inputs) /
- footer (botones). Stepper con header sobre fondo gray-50 y borde
- inferior. Alerts full-width para colisiones (bad), saltos de dia
- (info), flash cargado (good), advertencias del preview (warn). Tabla
- de pre_cortes con wrap y accion delete inline.
-- **`batch-detail.component.*`** — Header con status chip inline en la
- meta, tabla de pre_cortes con wrap, alert info al pie explicando
- inmutabilidad. `<code>` con estilo monospace + fondo gray-100.
-- **`downloads.component.*`** — Consolidado destacado con card
- `--featured` (banda naranja lateral), file rows con icono chip
- coloreado + nombre + meta, tabla compacta para dailies, seccion ZIP
- al final. Empty states elegantes.
-
-### Cambios menores
-
-- Se anadio `MatTooltipModule` al wizard (para tooltip del boton
- delete inline).
-- Se removio el uso del atributo `iconPositionEnd` en `<mat-icon>`
- dentro de botones (no existe en la version instalada de Material).
-- Removidos todos los `style="..."` inline salvo un puñado justificado
- en tablas (ancho fijo de columnas de accion).
-
-### Verificacion visual (checklist para el usuario)
-
-- **Toolbar**: logo NutriAvicola en chip blanco con nitidez, titulo
- "NutriAvicola BI" + subtitulo, botones nav con separador vertical.
-- **Dashboard**: 4 KPI cards con iconos y jerarquia visual clara. Tabla
- con headers navy pequeños uppercase; hover cambia el row a navy-50.
-- **Wizard**: cada paso tiene head + body + footer definidos. Alerts
- con iconografia Material (warning_amber, error_outline, task_alt,
- check_circle, info). Botones "Continuar" en flat primary; "Atras"
- en text mat-button.
-- **Downloads**: consolidado en card con banda naranja lateral y CTA
- primary grande. Dailies en tabla compacta. ZIP en card final.
-- **Detail**: status chip pill con dot indicator, tabla con hover, alert
- info al pie con `<code>` estilizado.
-
-### Build de produccion
-
-`npm run build` produce:
-- `main-*.js` — 390 KB raw / 98 KB gzip (dentro del budget de 600 KB
- initial warning).
-- `styles-*.css` — 24 KB raw / 4.1 KB gzip.
-- Lazy chunks: wizard 44 KB gzip, dashboard 2 KB gzip, downloads
- 2.5 KB gzip, detail 2 KB gzip.
-
-Ningun budget `anyComponentStyle` excedido (los component .scss suman
-< 2 KB cada uno; el grueso vive en el `styles.scss` global).
-
-### Rollback
-
-Si algo se ve mal en produccion, revertir el commit del rediseño
-(`git revert <sha>`) restaura Fase 7C.1 sin tocar Fase 7D/7E, ya que
-todo el cambio vive en `frontend/`.
-
----
-
-## Fase 7C - Frontend Angular (2026-07-06)
-
-**Stack**: Angular 22 (standalone components + signals + lazy routing) +
-Angular Material 3 con paleta corporativa NutriAvicola (navy `#0F2E4C`
-primary + naranja `#E87722` accent). SCSS puro, sin Tailwind, sin React.
-
-**Estructura** ([frontend/](frontend/)):
-
-```
-frontend/
-  src/
-    app/
-      core/
-        models.ts               interfaces TS <-> Pydantic schemas
-        batches.service.ts      HttpClient wrapper de los 16 endpoints /batches
-      features/
-        dashboard/              contadores + tabla batches recientes
-        batches/
-          batch-wizard.*        mat-stepper 5 pasos
-          batch-detail.*        detalle read-only + archivar
-          downloads.*           3 secciones (consolidado / dailies / zip)
-      app.{ts,html,scss}        root con toolbar + logo NutriAvicola
-      app.config.ts             providers globales (Router + HttpClient + Animations)
-      app.routes.ts             rutas lazy loaded
-    environments/
-      environment.ts            dev localhost:8000
-      environment.prod.ts       prod URL Railway
-    assets/logo.jpg             copia del resources/
-    styles.scss                 tema Material 3 + CSS vars corporativas
-  vercel.json                   SPA rewrite + build settings
-  angular.json                  fileReplacements dev -> prod
-  README.md                     guia dev + deploy
-```
-
-**Wizard de 5 pasos** ([batch-wizard.component](frontend/src/app/features/batches/batch-wizard.component.ts)):
-
-1. **Nombrar** — form con validacion `Validators.required`.
-2. **PRE CORTES** — input multiple con soporte `.xlsx` + `.zip`. Detecta
-   por extension y dispara `uploadPreCortes` o `uploadPreCortesFromZip`.
-   Tabla en vivo con fecha extraida (incluyendo skip de dias no laborales),
-   boton eliminar por fila.
-3. **FLASH mensual** — dos selectores anio/mes + input file. La API valida
-   coherencia del periodo antes de aceptar.
-4. **Preview** — llama `GET /batches/:id/preview`, renderiza:
-   - Alertas si el flash no cuadra (nutri-badge warn).
-   - Alertas si hay colisiones (nutri-badge bad, bloquea confirmacion).
-   - Info si hubo saltos por dia no laboral (nutri-badge info).
-   - Tabla dias con `cumplimiento_pct` coloreado (verde/amarillo/rojo).
-5. **Generar** — llama `POST /confirm` + `POST /generate` en secuencia,
-   muestra resultado (consolidado, zip) + boton "Ir a descargas".
-
-**Descargas** ([downloads.component](frontend/src/app/features/batches/downloads.component.ts)):
-tres secciones (consolidado, N dailies, ZIP) con `<a href download>`
-directo al endpoint `GET /batches/:id/downloads/:filename` del backend.
-
-**Verificacion E2E** contra backend local:
-
-```
-$ curl POST /batches -> {"id":"073cb45e...","status":"draft"}
-$ curl POST /batches/{id}/pre-cortes (multipart) -> 200
-$ curl POST /batches/{id}/flash?year=2026&month=2 (multipart) -> 200
-$ curl GET /batches/{id}/preview -> {"listo_para_confirmar":true,"dias":1}
-```
-
-CORS preflight OPTIONS retorna
-`Access-Control-Allow-Origin: http://127.0.0.1:4200`.
-
-**Build production**: 100 KB gzip bundle inicial, chunks lazy por ruta
-(dashboard 6 KB, wizard 43 KB, detail 2 KB, downloads 2 KB).
-
-**Deploy en Vercel** — ver [docs/deploy_vercel.md](docs/deploy_vercel.md).
-Framework preset `Other`, root directory `frontend`, `vercel.json` ya
-tiene el SPA rewrite. Antes del deploy, actualizar
-`environment.prod.ts` con la URL Railway del backend.
-
-### Niveles de granularidad (en orden de simplicidad)
-
-1. **Total huevos** (nivel prioritario para arrancar) - suma de todo el
-   RESUMEN vs suma del FLASH del dia. Esto sale directo de la fila `TOTAL`
-   del RESUMEN (columnas C-Q sumadas) y es lo que negocio quiere ver primero.
-2. **Por categoria de huevo** (TIPO: A, AA, AAA, AAAA, B, C) - agrupa por
-   la columna `tipo` del `sku_catalog` / RESUMEN. Corresponde a las filas
-   39-43 del RESUMEN (subtotales por TIPO).
-3. **Por marca / referencia** (MARCA ORO, PLUS, CAMPESINO, KOSHER, DHA,
-   SELENIO, JUNIOR, TAEQ, OLIMPICA, ...) - se implementa despues; requiere
-   coordinar aliases entre RESUMEN y homologacion.
-
-### Estructura del .xlsx (5 hojas, 100% tabular, sin literatura)
-
-Archivo corporativo: **solo tablas relacionadas, cero instrucciones**. El
-equipo de BI ya sabe leer un Excel; no hace falta "como leer este archivo",
-ni leyenda de semaforo, ni cards decorativos. Todo es tabla con header
-navy y bordes visibles.
-
-- **Portada**: logo NutriAvicola en A1 + titulo + tabla `Indicador | Valor`
-  con 7 filas: cumplimiento global (%), plan total, real total, delta,
-  dias, materiales cruzados, filas no cruzadas. El valor del cumplimiento
-  se semaforea (verde/amarillo/rojo) segun rango. **Nada mas.**
-- **Resumen**: una fila por `fecha_produccion` con `plan_total`,
-  `real_total`, `delta_total`, `cumplimiento_pct`. Fila TOTAL al final.
-- **Por_Categoria**: filas `fecha_produccion x tipo` con `plan_categoria`,
-  `real_categoria`, `cumplimiento_pct`. Las 6 categorias siempre.
-- **Detalle_Material**: dump de la tabla `cruce` con columnas legibles
-  para tablas dinamicas del equipo de BI.
-- **No_Cruzados**: `no_cruzados` con `origen` (pre_corte | flash) y motivo.
-
-### Diseno visual y replicable a escala
-
-**No es aceptable** un archivo con celdas planas y sin formato. El archivo
-tiene que verse profesional al abrirlo. Pero tampoco es aceptable formatear
-celda por celda de forma ad-hoc: eso no escala cuando agreguemos hojas o
-cuando negocio pida cambiar la paleta.
-
-**Solucion:** un modulo `app/core/excel_style.py` con:
-
-- **Paleta corporativa NutriAvicola** derivada del logo `resources/`:
-  `BRAND_NAVY = "#0F2E4C"` (headers), `BRAND_ORANGE = "#E87722"` (acentos),
-  `BRAND_ORANGE_LIGHT = "#FCE1C7"` (fila TOTAL), grid `#8C8C8C` (bordes
-  visibles), y semaforo estilo Excel clasico (`#63BE7B / #FFEB84 /
-  #F8696B`). Cambiar la paleta = editar una constante.
-- **`NamedStyle` registrados una sola vez en el workbook**
-  (`st_header`, `st_kpi_header`, `st_body_int`, `st_body_pct`,
-  `st_body_text`, `st_body_date`, `st_total_int`, `st_total_pct`,
-  `st_total_label`, `st_kpi_label`, `st_kpi_value_int`,
-  `st_kpi_value_pct_good|warn|bad`, `st_title`, `st_subtitle`). Openpyxl
-  los aplica por nombre; es ~10x mas rapido que estilar celda por celda.
-- **`write_dataframe_as_table(...)`** escribe el DataFrame como Excel Table
-  nativa con `TableStyleMedium9` (bordes marcados) + aplica bordes
-  explicitos por celda para que no dependa del TableStyle.
-- **`write_kpi_table(ws, kpis, start_row)`** arma una tabla `Indicador |
-  Valor` con header navy, filas alternas gris claro y bordes visibles.
-  Reemplaza el "kpi card" grande — es tabla, no decorativo.
-- **`insert_logo(ws, path, anchor, max_height_px)`** carga el logo
-  corporativo desde `resources/` y lo escala.
-- **`apply_traffic_light(ws, col_letter, from_row, to_row)`** con
-  `CellIsRule` en 3 rangos discretos.
-- **`add_title_block(ws, title, subtitle)`** titulo + subtitulo con merge.
-- **`set_page_setup(ws)`**: landscape, fit-to-page, gridlines ocultas,
-  zoom 100 %, freeze panes.
-
-**Regla de oro para que escale:** el modulo `exporters.py` **nunca** llama
-a `Font(...)`, `Fill(...)` o `Border(...)` directamente. Solo llama a las
-funciones/estilos de `excel_style.py`. Si maniana negocio pide cambiar el
-azul corporativo a verde, se edita una constante y todas las hojas se
-actualizan. Si se agrega la hoja `Por_Marca` en la Fase 6.5, se reutilizan
-las mismas funciones.
-
-**Elementos visuales concretos por hoja:**
-- Header: fondo `BRAND_NAVY` (`#0F2E4C`), texto blanco negrita 11pt,
-  altura 28, alineacion centrada, borde medium navy oscuro (`#081A2C`).
-- Body: fuente navy sobre blanco, borde `thin` gris `#8C8C8C` en las 4
-  direcciones de cada celda (bordes 100% visibles).
-- Banded rows nativas via Excel Table Medium9 (Excel las repinta al
-  filtrar).
-- Fila TOTAL: fondo naranja claro `#FCE1C7`, negrita, borde medium
-  naranja profundo `#B85F1A`.
-- Columnas de `cumplimiento_pct`: formato `"0.00%"`, semaforo con
-  `CellIsRule` (verde `#63BE7B`, amarillo `#FFEB84`, rojo `#F8696B`).
-- Columnas de unidades: formato `"#,##0"` (separador de miles).
-- Freeze panes debajo del header.
-- Anchos de columna autoajustados con tope de 40 caracteres.
-- Portada: logo NutriAvicola en A1 + titulo + tabla KPI. Sin cards
-  decorativos ni instrucciones.
-
-### Resultado verificado sobre el fixture (Fase 6)
-
-`_demo_export.py` sobre `PRE CORTE 13.02.2026 (1).xlsx` + `FLASH.xlsx`:
-
-- Archivo generado: `data/onedrive_export/cumplimiento_20260214_20260214.xlsx`
-  (~16.5 KB, 5 hojas, 4 Excel Tables, 3 rangos con semaforo).
-- Portada: card con "Cumplimiento global del rango" en pantalla completa,
-  info del rango de fechas y una guia rapida de las 5 hojas.
-- Resumen: 1 fila por dia + fila TOTAL con fondo amarillo.
-- Por_Categoria: 7 categorias (las 6 estandar + `AA-A` derivada del
-  catalogo) para cada fecha, con 0 donde no hay actividad.
-- Detalle_Material: dump legible del cruce con SAP, referencia, tipo,
-  formato, plan, real, delta, cumplimiento %.
-- No_Cruzados: fugas (origen='flash') y solo_pre (origen='pre_corte')
-  con motivo.
-
-Tests: 18/18 en `test_excel_style.py` + 14/14 en `test_exporters.py`,
-incluyendo el test de "puritanismo" que **falla el build** si alguien
-mete `Font(...)` directo en `exporters.py`.
-
----
-
-## Referencias
-
-- Fixtures de test: `tests/fixtures/`
-- Documentacion Power Automate: `docs/tutorial_power_automate_orquestador.md` (pendiente Fase 7)
-- Documentacion Copilot Studio: `docs/tutorial_copilot_studio_embed.md` (pendiente Fase 5)
-- Excel de la Fase 6: se genera via `GET /kpis/excel?desde=&hasta=` o via
-  `app.core.exporters.export_cumplimiento_xlsx()`. Se cachea en
-  `data/onedrive_export/cumplimiento_YYYYMMDD_YYYYMMDD.xlsx`.
-- Demo end-to-end del Excel: `venv\Scripts\python.exe _demo_export.py`.
-- Estilo del Excel: **todo** en `app/core/excel_style.py`. `exporters.py`
-  no puede importar `Font/PatternFill/Border/Alignment/Side` (test
-  `test_exporters_no_importa_styles_directamente` lo verifica).
+- LLM calculando KPIs o decidiendo cruces en runtime. Solo propone
+  configuracion que el humano aprueba.
+- Asumir el grano de una tabla sin confirmarlo con datos o con el usuario.
+- Repetir preguntas ya respondidas en `profile_knowledge`.
+- Persistir o ejecutar un profile con preguntas bloqueantes abiertas.
+- Romper la regresion PRE CORTE: `pre_corte_v1.json` debe reproducir
+  KPIs identicos a los del pipeline legado (mismos valores numericos;
+  criterio exacto en rubrica.md, que es la fuente unica de los gates).
+- Commitear datos reales de negocio (`data_nivel_cumplimiento/`, FLASH,
+  PRE CORTE operativos). Solo fixtures recortados en `tests/fixtures/`.
+- Formatear Excel fuera de `excel_style.py` (regla heredada, sigue viva).
+
+## Estado de fases del proyecto actual
+
+Ver [road.md](road.md) para el detalle vivo. Resumen:
+
+- [x] **Fase 0** - Gobernanza y memoria: AGENTS.md nuevo, road.md,
+  rubrica.md, fixtures CEN/SAP, exploracion de estructura real (2026-07-08).
+- [x] **Fase 1** - Contrato MatchProfile + ConfigurableLoader + motor
+  generico. PRE CORTE como profile #1 con regresion verde (2026-07-08).
+  Modulos: app/platform/{profile,loader,engine,store}.py; profiles en
+  profiles/*.json; 34 tests nuevos, suite 238/238.
+- [x] **Fase 2** - Agentes Pydantic AI + chat de entrevista con cola de
+  preguntas + memoria por proceso + telemetria (gate API real cumplido).
+- [ ] **Fase 3** - Caso CEN vs SAP end-to-end con entrevista real.
+- [ ] **Fase 4** - Renderers: Excel declarativo por profile + PBIP Power
+  BI con tema de marca.
+- [ ] **Fase 5** - Frontend Angular generico con chat + n8n por profile.
+- [ ] **Fase 6** - Verificacion intensiva + informes de uso, mantenimiento
+  y presupuesto.

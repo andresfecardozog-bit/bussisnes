@@ -1,0 +1,332 @@
+{
+  "profile_id": "cen_vs_sap_v1_borrador",
+  "version": 2,
+  "schema_version": 1,
+  "descripcion": "BORRADOR A MANO (Fase 1/3) para validar que el contrato expresa el caso CEN vs SAP con los requisitos de negocio: nivel de servicio (pedidos completos/parciales/no entregados en % y unidades), KPIs de devoluciones por motivo de rechazo, rechazos en ventas que NO son devoluciones, y desgloses por material, distrito, cliente y canal. La version definitiva la proponen los agentes en Fase 3 tras la entrevista. Grano confirmado con datos: fila CEN = linea de producto; ambas fuentes se agrupan por (orden, item) antes del join. HALLAZGO CLAVE (junio 2026 real): ~57% de las filas SAP no tienen codigo de orden CEN porque son canales de venta directa/manual que NO pasan por CEN (TAT 99.4%, PUNTOS PROPIOS 99.9%, EMPLEADOS 99.3%); esas ventas quedan como solo_right y NO son errores. Los placeholders de texto ('*', 'SIN DC') si pueden ser errores humanos. Las ordenes CEN reales llegan con formato con guion (003-0023901) o numerico (261357, 4241151659), principalmente de SUPERINDEPENDIENTES y CADENAS. Las DEVOLUCIONES del SAP (tipo_operacion col 13) se excluyen de las entregas y se reportan aparte por motivo de rechazo (col 62); ese mismo motivo aparece tambien en ventas no-devolucion y se reporta como rechazos operativos.",
+  "parameters": [],
+  "left": {
+    "role": "cen",
+    "label": "CEN (ordenes de compra totales)",
+    "loader": {
+      "type": "tabular",
+      "sheet": null,
+      "header_row": 1,
+      "columns": [
+        {"name": "numero_orden", "source": "Numero de la Orden de compra", "dtype": "str"},
+        {"name": "codigo_item", "source": "Codigo item proveedor", "dtype": "str", "required": false},
+        {"name": "descripcion_item", "source": "Descripcion del item", "dtype": "str", "required": false},
+        {"name": "cantidad_total", "source": "Cantidad Total", "dtype": "float_clean"},
+        {"name": "fecha_documento", "source": "F. Documento O/C", "dtype": "date", "required": false},
+        {"name": "razon_social_comprador", "source": "Razon Social Empresa Compradora", "dtype": "str", "required": false}
+      ],
+      "drop_rows_where_null": ["numero_orden"]
+    },
+    "transforms": [
+      {
+        "op": "group_by_aggregate",
+        "by": ["numero_orden", "codigo_item"],
+        "aggregations": [
+          {"target": "cantidad_pedida", "source": "cantidad_total", "fn": "sum"},
+          {"target": "descripcion_item", "source": "descripcion_item", "fn": "first"},
+          {"target": "cliente", "source": "razon_social_comprador", "fn": "first"},
+          {"target": "fecha_orden", "source": "fecha_documento", "fn": "first"}
+        ]
+      }
+    ]
+  },
+  "right": {
+    "role": "sap",
+    "label": "SAP (facturado / entregado)",
+    "loader": {
+      "type": "tabular",
+      "sheet": null,
+      "header_row": null,
+      "columns": [
+        {"name": "numero_pedido", "source": 56, "dtype": "str"},
+        {"name": "material_sap", "source": 40, "dtype": "str", "required": false},
+        {"name": "descripcion_material", "source": 41, "dtype": "str", "required": false},
+        {"name": "cantidad", "source": 42, "dtype": "float_clean"},
+        {"name": "distrito", "source": 11, "dtype": "str", "required": false},
+        {"name": "canal", "source": 7, "dtype": "str", "required": false},
+        {"name": "tipo_operacion", "source": 13, "dtype": "str", "required": false},
+        {"name": "cliente_sap", "source": 29, "dtype": "str", "required": false},
+        {"name": "categoria_huevo", "source": 45, "dtype": "str", "required": false},
+        {"name": "motivo_devolucion", "source": 62, "dtype": "str", "required": false}
+      ],
+      "drop_rows_where_null": ["numero_pedido"]
+    },
+    "transforms": [
+      {
+        "op": "filter_not_equals",
+        "column": "tipo_operacion",
+        "value": "DEVOLUCIONES"
+      },
+      {
+        "op": "group_by_aggregate",
+        "by": ["numero_pedido", "material_sap"],
+        "aggregations": [
+          {"target": "cantidad_entregada", "source": "cantidad", "fn": "sum"},
+          {"target": "descripcion_material", "source": "descripcion_material", "fn": "first"},
+          {"target": "distrito", "source": "distrito", "fn": "first"},
+          {"target": "canal", "source": "canal", "fn": "first"},
+          {"target": "cliente_sap", "source": "cliente_sap", "fn": "first"},
+          {"target": "categoria_huevo", "source": "categoria_huevo", "fn": "first"}
+        ]
+      }
+    ]
+  },
+  "join": {
+    "keys": [
+      {
+        "left": "numero_orden",
+        "right": "numero_pedido",
+        "normalizers": ["strip"]
+      },
+      {
+        "left": "codigo_item",
+        "right": "material_sap",
+        "normalizers": ["strip", "lstrip_zeros"]
+      }
+    ],
+    "type": "outer"
+  },
+  "computed": [
+    {
+      "name": "delta_unidades",
+      "op": "subtract",
+      "left": "cantidad_entregada",
+      "right": "cantidad_pedida"
+    },
+    {
+      "name": "cumplimiento_pct",
+      "op": "ratio_pct",
+      "left": "cantidad_entregada",
+      "right": "cantidad_pedida",
+      "round": 2
+    }
+  ],
+  "service_level": {
+    "plan_column": "cantidad_pedida",
+    "real_column": "cantidad_entregada",
+    "pedido_key": "numero_orden",
+    "tolerancia_pct": 0.0
+  },
+  "breakdowns": [
+    {
+      "id": "por_material",
+      "label": "Nivel de servicio por material",
+      "dimensions": ["codigo_item", "descripcion_item"],
+      "metrics": [
+        {"id": "unidades_pedidas", "op": "sum", "column": "cantidad_pedida"},
+        {"id": "unidades_entregadas", "op": "sum", "column": "cantidad_entregada"},
+        {"id": "lineas", "op": "count"},
+        {"id": "cumplimiento_pct", "op": "ratio_pct_of_sums", "numerator": "cantidad_entregada", "denominator": "cantidad_pedida"}
+      ],
+      "universe": "left_full",
+      "sort_by_metric": "unidades_pedidas"
+    },
+    {
+      "id": "por_distrito",
+      "label": "Nivel de servicio por distrito",
+      "dimensions": ["distrito"],
+      "metrics": [
+        {"id": "unidades_pedidas", "op": "sum", "column": "cantidad_pedida"},
+        {"id": "unidades_entregadas", "op": "sum", "column": "cantidad_entregada"},
+        {"id": "lineas", "op": "count"},
+        {"id": "cumplimiento_pct", "op": "ratio_pct_of_sums", "numerator": "cantidad_entregada", "denominator": "cantidad_pedida"}
+      ],
+      "universe": "matched",
+      "sort_by_metric": "unidades_pedidas"
+    },
+    {
+      "id": "por_cliente",
+      "label": "Nivel de servicio por cliente",
+      "dimensions": ["cliente"],
+      "metrics": [
+        {"id": "unidades_pedidas", "op": "sum", "column": "cantidad_pedida"},
+        {"id": "unidades_entregadas", "op": "sum", "column": "cantidad_entregada"},
+        {"id": "lineas", "op": "count"},
+        {"id": "cumplimiento_pct", "op": "ratio_pct_of_sums", "numerator": "cantidad_entregada", "denominator": "cantidad_pedida"}
+      ],
+      "universe": "left_full",
+      "sort_by_metric": "unidades_pedidas"
+    },
+    {
+      "id": "por_cliente_material",
+      "label": "Nivel de servicio por cliente y material",
+      "dimensions": ["cliente", "codigo_item", "descripcion_item"],
+      "metrics": [
+        {"id": "unidades_pedidas", "op": "sum", "column": "cantidad_pedida"},
+        {"id": "unidades_entregadas", "op": "sum", "column": "cantidad_entregada"},
+        {"id": "cumplimiento_pct", "op": "ratio_pct_of_sums", "numerator": "cantidad_entregada", "denominator": "cantidad_pedida"}
+      ],
+      "universe": "left_full",
+      "sort_by_metric": "unidades_pedidas"
+    },
+    {
+      "id": "devoluciones_por_motivo",
+      "label": "Devoluciones por motivo de rechazo",
+      "dimensions": ["motivo_devolucion"],
+      "metrics": [
+        {"id": "unidades_devueltas", "op": "sum", "column": "cantidad"},
+        {"id": "lineas", "op": "count"}
+      ],
+      "universe": "right_source",
+      "filter_equals": {"tipo_operacion": "DEVOLUCIONES"},
+      "require_non_null": ["motivo_devolucion"],
+      "sort_by_metric": "unidades_devueltas"
+    },
+    {
+      "id": "devoluciones_por_distrito",
+      "label": "Devoluciones por distrito",
+      "dimensions": ["distrito"],
+      "metrics": [
+        {"id": "unidades_devueltas", "op": "sum", "column": "cantidad"},
+        {"id": "lineas", "op": "count"}
+      ],
+      "universe": "right_source",
+      "filter_equals": {"tipo_operacion": "DEVOLUCIONES"},
+      "sort_by_metric": "unidades_devueltas"
+    },
+    {
+      "id": "rechazos_no_devolucion",
+      "label": "Rechazos en ventas (no devolucion) por motivo",
+      "dimensions": ["motivo_devolucion"],
+      "metrics": [
+        {"id": "unidades_afectadas", "op": "sum", "column": "cantidad"},
+        {"id": "lineas", "op": "count"}
+      ],
+      "universe": "right_source",
+      "filter_not_equals": {"tipo_operacion": "DEVOLUCIONES"},
+      "require_non_null": ["motivo_devolucion"],
+      "sort_by_metric": "lineas"
+    },
+    {
+      "id": "ventas_por_canal",
+      "label": "Ventas SAP por canal",
+      "dimensions": ["canal"],
+      "metrics": [
+        {"id": "unidades", "op": "sum", "column": "cantidad"},
+        {"id": "lineas", "op": "count"}
+      ],
+      "universe": "right_source",
+      "require_non_null": ["canal"],
+      "sort_by_metric": "unidades"
+    }
+  ],
+  "kpis": [
+    {
+      "id": "cumplimiento_entregas_pct",
+      "label": "Nivel de cumplimiento de entregas (%)",
+      "op": "ratio_pct_of_sums",
+      "numerator": "cantidad_entregada",
+      "denominator": "cantidad_pedida",
+      "semaforo": {
+        "verde_min": 95.0,
+        "amarillo_min": 85.0
+      }
+    },
+    {
+      "id": "unidades_pedidas",
+      "label": "Unidades pedidas (CEN)",
+      "op": "sum",
+      "numerator": "cantidad_pedida"
+    },
+    {
+      "id": "unidades_entregadas",
+      "label": "Unidades entregadas (SAP)",
+      "op": "sum",
+      "numerator": "cantidad_entregada"
+    },
+    {
+      "id": "lineas_cruzadas",
+      "label": "Lineas orden-item cruzadas",
+      "op": "count"
+    }
+  ],
+  "unmatched_motivo_left": "orden/item pedido en CEN sin entrega registrada en SAP",
+  "unmatched_motivo_right": "entrega en SAP sin orden CEN correspondiente en el periodo",
+  "data_model": {
+    "fact_name": "FactNivelServicio",
+    "dimensions": [
+      {"name": "DimCliente", "key": "cliente", "attributes": []},
+      {"name": "DimMaterial", "key": "codigo_item", "attributes": ["descripcion_item"]},
+      {"name": "DimDistrito", "key": "distrito", "attributes": []}
+    ],
+    "include_unmatched": true
+  },
+  "report": {
+    "excel": {
+      "filename_prefix": "nivel_servicio_cen",
+      "sheets": [
+        {"name": "Portada", "kind": "portada"},
+        {"name": "Resumen", "kind": "kpi_resumen", "source": "kpis"},
+        {"name": "Por_Material", "kind": "breakdown", "breakdown_id": "por_material"},
+        {"name": "Por_Distrito", "kind": "breakdown", "breakdown_id": "por_distrito"},
+        {"name": "Por_Cliente", "kind": "breakdown", "breakdown_id": "por_cliente"},
+        {"name": "Cliente_Material", "kind": "breakdown", "breakdown_id": "por_cliente_material"},
+        {"name": "Devoluciones", "kind": "breakdown", "breakdown_id": "devoluciones_por_motivo"},
+        {"name": "Devol_Distrito", "kind": "breakdown", "breakdown_id": "devoluciones_por_distrito"},
+        {"name": "Rechazos_Ventas", "kind": "breakdown", "breakdown_id": "rechazos_no_devolucion"},
+        {"name": "Ventas_Canal", "kind": "breakdown", "breakdown_id": "ventas_por_canal"},
+        {"name": "Detalle_Ordenes", "kind": "tabla", "source": "matched"},
+        {"name": "No_Cruzados", "kind": "tabla", "source": "no_cruzados"}
+      ]
+    },
+    "powerbi": {
+      "theme": "nutriavicola",
+      "measures": [
+        {"id": "unidades_pedidas", "label": "Unidades pedidas", "op": "sum", "table": "FactNivelServicio", "column": "cantidad_pedida", "format": "entero"},
+        {"id": "unidades_entregadas", "label": "Unidades entregadas", "op": "sum", "table": "FactNivelServicio", "column": "cantidad_entregada", "format": "entero"},
+        {"id": "nivel_servicio_pct", "label": "Nivel de servicio (%)", "op": "ratio_pct_of_sums", "table": "FactNivelServicio", "numerator": "cantidad_entregada", "denominator": "cantidad_pedida", "format": "porcentaje"},
+        {"id": "pedidos_totales", "label": "Pedidos totales", "op": "distinct_count", "table": "FactNivelServicio", "column": "key_numero_orden", "format": "entero"},
+        {"id": "lineas_totales", "label": "Lineas de pedido", "op": "count", "table": "FactNivelServicio", "format": "entero"}
+      ],
+      "pages": [
+        {
+          "name": "Nivel de servicio",
+          "proposito": "Vision ejecutiva: cuanto de lo pedido se entrego, en unidades y porcentaje",
+          "visuals": [
+            {"kind": "card_kpi", "title": "Nivel de servicio", "measure": "nivel_servicio_pct", "table": "FactNivelServicio", "justificacion": "KPI principal pedido por negocio"},
+            {"kind": "card_kpi", "title": "Unidades pedidas", "measure": "unidades_pedidas", "table": "FactNivelServicio", "justificacion": "Contexto en unidades del denominador"},
+            {"kind": "card_kpi", "title": "Unidades entregadas", "measure": "unidades_entregadas", "table": "FactNivelServicio", "justificacion": "Contexto en unidades del numerador"},
+            {"kind": "card_kpi", "title": "Pedidos totales", "measure": "pedidos_totales", "table": "FactNivelServicio", "justificacion": "Nivel de servicio tambien se lee por pedido, no solo por unidades"},
+            {"kind": "donut", "title": "Lineas por estado de entrega", "category": "nivel_servicio", "measure": "lineas_totales", "table": "FactNivelServicio", "justificacion": "Distribucion completo/parcial/no entregado de un vistazo"},
+            {"kind": "barras_categoria", "title": "Nivel de servicio por distrito", "measure": "nivel_servicio_pct", "category": "distrito", "table": "FactNivelServicio", "justificacion": "Comparar regionales para focalizar gestion"}
+          ]
+        },
+        {
+          "name": "Clientes y materiales",
+          "proposito": "Desglose operativo: donde se concentra el incumplimiento",
+          "visuals": [
+            {"kind": "barras_categoria", "title": "Nivel de servicio por cliente", "measure": "nivel_servicio_pct", "category": "cliente", "table": "FactNivelServicio", "justificacion": "Clientes mas afectados por faltantes"},
+            {"kind": "barras_categoria", "title": "Unidades pedidas por material", "measure": "unidades_pedidas", "category": "descripcion_item", "table": "FactNivelServicio", "justificacion": "Volumen por presentacion de huevo"},
+            {"kind": "matriz", "title": "Cliente x material", "measure": "nivel_servicio_pct", "category": "cliente", "table": "FactNivelServicio", "justificacion": "Cruce dimensional pedido por negocio"},
+            {"kind": "tabla_detalle", "title": "Detalle por orden e item", "table": "FactNivelServicio", "justificacion": "Drill-down completo para auditoria"}
+          ]
+        },
+        {
+          "name": "Devoluciones",
+          "proposito": "Por que y donde se devuelve: motivos de rechazo y distritos con mas devoluciones",
+          "visuals": [
+            {"kind": "card_kpi", "title": "Unidades devueltas", "measure": "unidades_devueltas", "table": "Devoluciones", "justificacion": "Magnitud total de devoluciones del periodo"},
+            {"kind": "donut", "title": "Participacion de devoluciones por motivo", "measure": "unidades_devueltas", "category": "motivo_devolucion", "table": "Devoluciones", "justificacion": "Peso relativo de cada causa de rechazo de un vistazo"},
+            {"kind": "barras_categoria", "title": "Unidades devueltas por motivo", "measure": "unidades_devueltas", "category": "motivo_devolucion", "table": "Devoluciones", "justificacion": "Ranking de causas para atacar la raiz (rotura, alistamiento...)"},
+            {"kind": "barras_categoria", "title": "Unidades devueltas por distrito", "measure": "unidades_devueltas", "category": "distrito", "table": "devoluciones_por_distrito", "justificacion": "Donde se concentran las devoluciones para focalizar logistica"},
+            {"kind": "tabla_detalle", "title": "Detalle de devoluciones por motivo", "table": "Devoluciones", "justificacion": "Registro completo por causa"}
+          ]
+        },
+        {
+          "name": "Rechazos y canales",
+          "proposito": "Rechazos operativos en ventas que no son devolucion, y composicion de ventas por canal (TAT y puntos propios venden directo sin orden CEN)",
+          "visuals": [
+            {"kind": "barras_categoria", "title": "Rechazos en ventas (no devolucion) por motivo", "measure": "lineas", "category": "motivo_devolucion", "table": "rechazos_no_devolucion", "justificacion": "Detecta problemas operativos (rotura, alistamiento) fuera del flujo de devoluciones formales"},
+            {"kind": "columnas_apiladas", "title": "Unidades afectadas por motivo de rechazo", "measure": "unidades_afectadas", "category": "motivo_devolucion", "table": "rechazos_no_devolucion", "justificacion": "Dimensiona el impacto en unidades de cada rechazo operativo"},
+            {"kind": "barras_categoria", "title": "Unidades vendidas por canal", "measure": "unidades", "category": "canal", "table": "ventas_por_canal", "justificacion": "Muestra que TAT y puntos propios son venta directa sin orden CEN, no faltantes"},
+            {"kind": "tabla_detalle", "title": "Ventas SAP por canal", "table": "ventas_por_canal", "justificacion": "Explica el universo solo_right: ventas legitimas fuera de CEN"}
+          ]
+        }
+      ]
+    }
+  }
+}

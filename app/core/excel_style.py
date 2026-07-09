@@ -88,6 +88,7 @@ _STYLE_NAMES = (
     "st_header",
     "st_kpi_header",
     "st_body_int",
+    "st_body_num",
     "st_body_pct",
     "st_body_text",
     "st_body_date",
@@ -161,6 +162,15 @@ def _make_named_styles() -> list[NamedStyle]:
     st_body_int.alignment = right
     st_body_int.border = body_border
     styles.append(st_body_int)
+
+    # Numerico con decimales preservados (tablas "base de datos": el valor
+    # no se redondea al escribir, a diferencia de st_body_int).
+    st_body_num = NamedStyle(name="st_body_num")
+    st_body_num.font = Font(name="Calibri", size=11, color=BRAND_NAVY_DEEP)
+    st_body_num.number_format = "#,##0.00"
+    st_body_num.alignment = right
+    st_body_num.border = body_border
+    styles.append(st_body_num)
 
     st_body_pct = NamedStyle(name="st_body_pct")
     st_body_pct.font = Font(name="Calibri", size=11, color=BRAND_NAVY_DEEP)
@@ -299,12 +309,13 @@ class ColumnSpec:
 
     name: str        # nombre visible en el header
     key: str         # clave en el DataFrame
-    kind: str = "text"   # int | pct | text | date
+    kind: str = "text"   # int | num | pct | text | date
 
     @property
     def body_style(self) -> str:
         return {
             "int": "st_body_int",
+            "num": "st_body_num",
             "pct": "st_body_pct",
             "date": "st_body_date",
         }.get(self.kind, "st_body_text")
@@ -313,6 +324,7 @@ class ColumnSpec:
     def total_style(self) -> str:
         return {
             "int": "st_total_int",
+            "num": "st_total_int",
             "pct": "st_total_pct",
         }.get(self.kind, "st_total_label")
 
@@ -395,7 +407,7 @@ def write_dataframe_as_table(
                 value = None
             elif col.kind == "int":
                 value = int(round(float(value)))
-            elif col.kind == "pct":
+            elif col.kind in ("num", "pct"):
                 value = float(value)
             elif col.kind == "date":
                 if isinstance(value, str):
@@ -532,12 +544,20 @@ class KpiRow:
     valor: float | int
     kind: str = "int"  # int | pct
     semaforo: bool = False  # si True y kind==pct, aplica color por rango
+    # Umbrales propios (fracciones) para perfiles con semaforo distinto al
+    # corporativo por defecto. None = usar SEMAFORO global.
+    rangos: dict | None = None
 
 
-def _semaforo_tier(valor: float) -> str:
-    if SEMAFORO["verde_min"] <= valor <= SEMAFORO["verde_max"]:
+def _semaforo_tier(valor: float, rangos: dict | None = None) -> str:
+    r = rangos or SEMAFORO
+    verde_max = r.get("verde_max")
+    amarillo_max = r.get("amarillo_max")
+    verde_max = float("inf") if verde_max is None else verde_max
+    amarillo_max = float("inf") if amarillo_max is None else amarillo_max
+    if r["verde_min"] <= valor <= verde_max:
         return "good"
-    if SEMAFORO["amarillo_min"] <= valor <= SEMAFORO["amarillo_max"]:
+    if r["amarillo_min"] <= valor <= amarillo_max:
         return "warn"
     return "bad"
 
@@ -570,7 +590,7 @@ def write_kpi_table(
         ws.cell(row=row, column=start_col, value=kpi.label).style = "st_kpi_label"
         cell = ws.cell(row=row, column=start_col + 1, value=float(kpi.valor))
         if kpi.kind == "pct" and kpi.semaforo:
-            cell.style = f"st_kpi_value_pct_{_semaforo_tier(float(kpi.valor))}"
+            cell.style = f"st_kpi_value_pct_{_semaforo_tier(float(kpi.valor), kpi.rangos)}"
         elif kpi.kind == "pct":
             cell.style = "st_body_pct"
         else:

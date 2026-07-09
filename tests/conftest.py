@@ -34,6 +34,8 @@ def isolated_db_with_catalog(tmp_path, monkeypatch):
 
     db_path = tmp_path / "test.sqlite"
     monkeypatch.setattr("app.core.db.DB_PATH", db_path)
+    monkeypatch.setattr("app.core.db.ADMIN_EMAIL", "admin@test.local")
+    monkeypatch.setattr("app.core.db.ADMIN_INITIAL_PASSWORD", "AdminPass123!")
     monkeypatch.setattr("app.config.DB_PATH", db_path)
     init_db(db_path)
     with get_conn(db_path) as conn:

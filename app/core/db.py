@@ -28,7 +28,8 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 import pandas as pd
 
-from app.config import DB_PATH
+from app.config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, DB_PATH
+from app.security.passwords import hash_password, new_token
 
 if TYPE_CHECKING:
     from app.core.matcher import MatchResult
@@ -44,6 +45,7 @@ _SCHEMA = [
         hash_sha256 TEXT NOT NULL,
         num_filas_original INTEGER NOT NULL,
         num_filas_procesadas INTEGER NOT NULL,
+        uploaded_by_user_id INTEGER REFERENCES users(id),
         cargado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(tipo, hash_sha256)
     );
@@ -131,6 +133,7 @@ _SCHEMA = [
     CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY,
         parent_run_id TEXT REFERENCES runs(id),
+        owner_user_id INTEGER REFERENCES users(id),
         started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         ended_at TIMESTAMP,
         status TEXT NOT NULL CHECK (status IN (
@@ -148,6 +151,7 @@ _SCHEMA = [
     """
     CREATE TABLE IF NOT EXISTS batches (
         id TEXT PRIMARY KEY,
+        owner_user_id INTEGER REFERENCES users(id),
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         status TEXT NOT NULL CHECK (status IN (
@@ -170,6 +174,89 @@ _SCHEMA = [
         UNIQUE(batch_id, pre_corte_carga_id)
     );
     """,
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        full_name TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        must_change_pwd INTEGER NOT NULL DEFAULT 0,
+        failed_attempts INTEGER NOT NULL DEFAULT 0,
+        locked_until TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS roles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL UNIQUE,
+        nombre TEXT NOT NULL,
+        descripcion TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS permissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL UNIQUE,
+        descripcion TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS role_permissions (
+        role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+        permission_id INTEGER NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+        PRIMARY KEY (role_id, permission_id)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS user_roles (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+        PRIMARY KEY (user_id, role_id)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        csrf_token TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        max_expires_at TEXT NOT NULL,
+        ip TEXT,
+        user_agent TEXT,
+        revoked_at TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS service_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_by_user_id INTEGER REFERENCES users(id),
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_used_at TEXT,
+        expires_at TEXT,
+        revoked_at TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        user_id INTEGER REFERENCES users(id),
+        action TEXT NOT NULL,
+        resource_type TEXT,
+        resource_id TEXT,
+        outcome TEXT NOT NULL,
+        ip TEXT,
+        detail TEXT
+    );
+    """,
     "CREATE INDEX IF NOT EXISTS idx_cargas_hash ON cargas(tipo, hash_sha256);",
     "CREATE INDEX IF NOT EXISTS idx_cruce_fecha ON cruce(fecha_produccion);",
     "CREATE INDEX IF NOT EXISTS idx_cruce_material ON cruce(material);",
@@ -182,7 +269,177 @@ _SCHEMA = [
     "CREATE INDEX IF NOT EXISTS idx_batches_status ON batches(status);",
     "CREATE INDEX IF NOT EXISTS idx_batches_updated_at ON batches(updated_at);",
     "CREATE INDEX IF NOT EXISTS idx_batch_pre_cortes_batch ON batch_pre_cortes(batch_id);",
+    "CREATE INDEX IF NOT EXISTS idx_cargas_owner ON cargas(uploaded_by_user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_runs_owner ON runs(owner_user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_batches_owner ON batches(owner_user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);",
+    "CREATE INDEX IF NOT EXISTS idx_service_tokens_user ON service_tokens(user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_audit_user_ts ON audit_log(user_id, ts);",
 ]
+
+
+def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(str(r[1]) == column for r in rows)
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column_def: str) -> None:
+    col_name = column_def.split()[0]
+    if _column_exists(conn, table, col_name):
+        return
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column_def}")
+
+
+def _seed_rbac(conn: sqlite3.Connection) -> None:
+    permissions: dict[str, str] = {
+        "users:manage": "Gestionar usuarios y tokens de servicio",
+        "files:upload": "Subir archivos",
+        "files:read:all": "Leer archivos de cualquier usuario",
+        "files:read:own": "Leer archivos propios",
+        "profiles:read:all": "Leer perfiles de cualquier usuario",
+        "profiles:read:own": "Leer perfiles propios",
+        "profiles:write": "Crear/editar perfiles",
+        "profiles:approve": "Aprobar perfiles",
+        "batches:read:all": "Leer batches de cualquier usuario",
+        "batches:read:own": "Leer batches propios",
+        "batches:write": "Crear/editar/generar batches",
+        "run:execute": "Ejecutar corridas de cualquier usuario",
+        "run:execute:own": "Ejecutar corridas propias",
+        "download:all": "Descargar archivos de cualquier usuario",
+        "download:own": "Descargar archivos propios",
+        "catalog:read": "Leer catalogo",
+        "catalog:write": "Gestionar catalogo",
+        "audit:read": "Leer auditoria",
+    }
+    for code, desc in permissions.items():
+        conn.execute(
+            """
+            INSERT INTO permissions (code, descripcion)
+            VALUES (?, ?)
+            ON CONFLICT(code) DO UPDATE SET descripcion = excluded.descripcion
+            """,
+            (code, desc),
+        )
+
+    roles = {
+        "admin": ("Administrador", "Acceso total"),
+        "analista_todos": ("Analista global", "Accede a todos los recursos"),
+        "analista_propios": ("Analista propio", "Accede solo a recursos propios"),
+        "sin_historial": ("Operador sin historial", "Puede ejecutar cruces sin consultar historico"),
+    }
+    for code, (nombre, descripcion) in roles.items():
+        conn.execute(
+            """
+            INSERT INTO roles (code, nombre, descripcion)
+            VALUES (?, ?, ?)
+            ON CONFLICT(code) DO UPDATE SET nombre = excluded.nombre, descripcion = excluded.descripcion
+            """,
+            (code, nombre, descripcion),
+        )
+
+    role_permissions = {
+        "admin": set(permissions.keys()),
+        "analista_todos": {
+            "files:upload",
+            "files:read:all",
+            "profiles:read:all",
+            "profiles:write",
+            "profiles:approve",
+            "batches:read:all",
+            "batches:write",
+            "run:execute",
+            "download:all",
+            "catalog:read",
+            "catalog:write",
+        },
+        "analista_propios": {
+            "files:upload",
+            "files:read:own",
+            "profiles:read:own",
+            "profiles:write",
+            "profiles:approve",
+            "batches:read:own",
+            "batches:write",
+            "run:execute:own",
+            "download:own",
+            "catalog:read",
+        },
+        "sin_historial": {
+            "files:upload",
+            "profiles:write",
+            "run:execute:own",
+        },
+    }
+    role_ids = {
+        str(r["code"]): int(r["id"])
+        for r in conn.execute("SELECT id, code FROM roles").fetchall()
+    }
+    perm_ids = {
+        str(r["code"]): int(r["id"])
+        for r in conn.execute("SELECT id, code FROM permissions").fetchall()
+    }
+    for role_code, perm_codes in role_permissions.items():
+        role_id = role_ids[role_code]
+        for perm_code in perm_codes:
+            perm_id = perm_ids[perm_code]
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
+                VALUES (?, ?)
+                """,
+                (role_id, perm_id),
+            )
+
+
+def _bootstrap_admin(conn: sqlite3.Connection) -> int:
+    admin = conn.execute(
+        "SELECT id FROM users WHERE lower(email) = ?",
+        (ADMIN_EMAIL.lower(),),
+    ).fetchone()
+    if admin:
+        return int(admin["id"])
+    initial_password = ADMIN_INITIAL_PASSWORD or new_token(16)
+    now = datetime.now(timezone.utc).isoformat()
+    cur = conn.execute(
+        """
+        INSERT INTO users (
+            email, password_hash, full_name, is_active, must_change_pwd,
+            failed_attempts, created_at, updated_at
+        ) VALUES (?, ?, ?, 1, 1, 0, ?, ?)
+        """,
+        (ADMIN_EMAIL.lower(), hash_password(initial_password), "Administrador", now, now),
+    )
+    admin_id = int(cur.lastrowid)
+    role_row = conn.execute(
+        "SELECT id FROM roles WHERE code = 'admin'"
+    ).fetchone()
+    if role_row:
+        conn.execute(
+            "INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
+            (admin_id, int(role_row["id"])),
+        )
+    if ADMIN_INITIAL_PASSWORD is None:
+        print(
+            "[SECURITY] Admin inicial creado. Email="
+            f"{ADMIN_EMAIL} password_temporal={initial_password}"
+        )
+    return admin_id
+
+
+def _backfill_owners(conn: sqlite3.Connection, admin_user_id: int) -> None:
+    conn.execute(
+        "UPDATE cargas SET uploaded_by_user_id = ? WHERE uploaded_by_user_id IS NULL",
+        (admin_user_id,),
+    )
+    conn.execute(
+        "UPDATE runs SET owner_user_id = ? WHERE owner_user_id IS NULL",
+        (admin_user_id,),
+    )
+    conn.execute(
+        "UPDATE batches SET owner_user_id = ? WHERE owner_user_id IS NULL",
+        (admin_user_id,),
+    )
 
 
 def init_db(path: str | Path | None = None) -> Path:
@@ -195,8 +452,15 @@ def init_db(path: str | Path | None = None) -> Path:
     p.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(p) as conn:
         conn.execute("PRAGMA foreign_keys = ON;")
+        conn.row_factory = sqlite3.Row
         for stmt in _SCHEMA:
             conn.execute(stmt)
+        _ensure_column(conn, "cargas", "uploaded_by_user_id INTEGER REFERENCES users(id)")
+        _ensure_column(conn, "runs", "owner_user_id INTEGER REFERENCES users(id)")
+        _ensure_column(conn, "batches", "owner_user_id INTEGER REFERENCES users(id)")
+        _seed_rbac(conn)
+        admin_user_id = _bootstrap_admin(conn)
+        _backfill_owners(conn, admin_user_id)
         conn.commit()
     return p
 
@@ -236,17 +500,27 @@ def get_or_insert_carga(
     meta: dict[str, Any],
     fecha_archivo: date | None = None,
     fecha_produccion: date | None = None,
+    uploaded_by_user_id: int | None = None,
 ) -> tuple[int, bool]:
     """Inserta la carga o retorna la existente si ya se cargo. `(carga_id, es_nueva)`."""
     existing = already_loaded(conn, meta["tipo"], meta["hash_sha256"])
     if existing is not None:
+        if uploaded_by_user_id is not None:
+            conn.execute(
+                """
+                UPDATE cargas
+                SET uploaded_by_user_id = COALESCE(uploaded_by_user_id, ?)
+                WHERE id = ?
+                """,
+                (uploaded_by_user_id, existing),
+            )
         return existing, False
     cur = conn.execute(
         """
         INSERT INTO cargas (
             filename, tipo, fecha_archivo, fecha_produccion,
-            hash_sha256, num_filas_original, num_filas_procesadas
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            hash_sha256, num_filas_original, num_filas_procesadas, uploaded_by_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             meta["filename"],
@@ -256,6 +530,7 @@ def get_or_insert_carga(
             meta["hash_sha256"],
             int(meta["num_filas_original"]),
             int(meta["num_filas_procesadas"]),
+            uploaded_by_user_id,
         ),
     )
     return int(cur.lastrowid), True
@@ -455,6 +730,7 @@ def create_run(
     conn: sqlite3.Connection,
     *,
     parent_run_id: str | None = None,
+    owner_user_id: int | None = None,
     pre_corte_carga_id: int | None = None,
     flash_carga_id: int | None = None,
     fecha_produccion: date | None = None,
@@ -466,13 +742,14 @@ def create_run(
     conn.execute(
         """
         INSERT INTO runs (
-            id, parent_run_id, status, current_step,
+            id, parent_run_id, owner_user_id, status, current_step,
             pre_corte_carga_id, flash_carga_id, fecha_produccion, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
             parent_run_id,
+            owner_user_id,
             status,
             current_step,
             pre_corte_carga_id,

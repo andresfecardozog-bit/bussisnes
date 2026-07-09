@@ -1,0 +1,128 @@
+{
+  "profile_id": "pre_corte_v1",
+  "version": 1,
+  "schema_version": 1,
+  "descripcion": "Cumplimiento de produccion de huevo: PRE CORTE (plan RESUMEN) vs FLASH (facturas SAP) por codigo MATERIAL. Re-expresion del pipeline legado como MatchProfile; sirve de regresion permanente de la plataforma generica.",
+  "parameters": [
+    {
+      "name": "fecha_produccion",
+      "type": "date",
+      "description": "Fecha de produccion a cruzar (fecha del archivo + 1 dia habil)",
+      "required": true
+    }
+  ],
+  "left": {
+    "role": "pre_corte",
+    "label": "PRE CORTE (plan de comercializacion)",
+    "loader": {
+      "type": "registered",
+      "name": "pre_corte_resumen"
+    },
+    "transforms": [
+      {
+        "op": "select_rename",
+        "mapping": {
+          "material": "material",
+          "referencia": "referencia",
+          "notificado": "notificado_unidades",
+          "producir_unidades": "producir_unidades"
+        }
+      }
+    ]
+  },
+  "right": {
+    "role": "flash",
+    "label": "FLASH (facturas SAP del dia)",
+    "loader": {
+      "type": "registered",
+      "name": "flash_sap"
+    },
+    "transforms": [
+      {
+        "op": "filter_equals",
+        "column": "fecha_factura",
+        "value": "$fecha_produccion"
+      },
+      {
+        "op": "group_by_aggregate",
+        "by": ["material"],
+        "aggregations": [
+          {"target": "real_unidades_flash", "source": "cantidad_neta", "fn": "sum"},
+          {"target": "facturado_real_total", "source": "facturado_real", "fn": "sum"},
+          {"target": "num_facturas", "source": "factura", "fn": "count"},
+          {"target": "nomb_material", "source": "nomb_material", "fn": "first"}
+        ]
+      }
+    ]
+  },
+  "join": {
+    "keys": [
+      {
+        "left": "material",
+        "right": "material",
+        "normalizers": ["to_int"]
+      }
+    ],
+    "type": "outer"
+  },
+  "computed": [
+    {
+      "name": "delta_unidades",
+      "op": "subtract",
+      "left": "real_unidades_flash",
+      "right": "notificado_unidades"
+    },
+    {
+      "name": "cumplimiento_pct",
+      "op": "ratio_pct",
+      "left": "real_unidades_flash",
+      "right": "notificado_unidades",
+      "round": 2
+    }
+  ],
+  "kpis": [
+    {
+      "id": "cumplimiento_global_pct",
+      "label": "Cumplimiento global (%)",
+      "op": "ratio_pct_of_sums",
+      "numerator": "real_unidades_flash",
+      "denominator": "notificado_unidades",
+      "semaforo": {
+        "verde_min": 95.0,
+        "verde_max": 105.0,
+        "amarillo_min": 85.0,
+        "amarillo_max": 115.0
+      }
+    },
+    {
+      "id": "plan_total_unidades",
+      "label": "Plan total (unidades)",
+      "op": "sum",
+      "numerator": "notificado_unidades"
+    },
+    {
+      "id": "real_total_unidades",
+      "label": "Real total (unidades)",
+      "op": "sum",
+      "numerator": "real_unidades_flash"
+    },
+    {
+      "id": "materiales_cruzados",
+      "label": "Materiales cruzados",
+      "op": "count"
+    }
+  ],
+  "unmatched_motivo_left": "material notificado sin venta en FLASH",
+  "unmatched_motivo_right": "material vendido sin notificacion previa",
+  "report": {
+    "excel": {
+      "filename_prefix": "cumplimiento",
+      "sheets": [
+        {"name": "Portada", "kind": "portada"},
+        {"name": "Resumen", "kind": "kpi_resumen", "source": "kpis"},
+        {"name": "Detalle_Material", "kind": "tabla", "source": "matched"},
+        {"name": "No_Cruzados", "kind": "tabla", "source": "no_cruzados"}
+      ]
+    }
+  }
+}

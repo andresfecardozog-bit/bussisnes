@@ -1,0 +1,51 @@
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-mark--compact {
+  gap: 8px;
+}
+
+.brand-mark__egg {
+  width: 34px;
+  height: 42px;
+  display: inline-flex;
+  filter: drop-shadow(0 4px 8px rgba(160, 107, 9, 0.28));
+}
+
+.brand-mark--compact .brand-mark__egg {
+  width: 28px;
+  height: 34px;
+}
+
+.brand-mark__egg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.brand-mark__text {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-mark__title {
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.1;
+  letter-spacing: 0.15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.brand-mark__subtitle {
+  color: inherit;
+  opacity: 0.82;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}

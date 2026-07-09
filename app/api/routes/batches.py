@@ -35,6 +35,7 @@ Descargas:
 from __future__ import annotations
 
 import io
+import logging
 import re
 import sqlite3
 import zipfile
@@ -48,6 +49,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 from app.api import storage
 from app.api.dependencies import db_connection
+from app.api.security import AuthUser, current_user, ensure_owner_access, require_permission
 from app.api.routes.files import _process_upload
 from app.api.schemas import (
     BatchDetailResponse,
@@ -65,7 +67,15 @@ from app.api.schemas import (
     ZipUploadIgnorado,
     ZipUploadResponse,
 )
-from app.config import FILENAME_PRE_CORTE_REGEX, ONEDRIVE_EXPORT_DIR
+from app.config import (
+    FILENAME_PRE_CORTE_REGEX,
+    MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_FILES_PER_REQUEST,
+    MAX_ZIP_COMPRESSION_RATIO,
+    MAX_ZIP_ENTRIES,
+    MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES,
+    ONEDRIVE_EXPORT_DIR,
+)
 from app.core import batches as bcore
 from app.core.aggregator import aggregate_flash
 from app.core.batches import BatchError, validar_flash_periodo
@@ -76,6 +86,7 @@ from app.core.matcher import match_by_material
 from app.core.storage_adapter import BUCKET_OUTPUTS, get_storage
 
 router = APIRouter(prefix="/batches", tags=["batches"])
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +94,41 @@ router = APIRouter(prefix="/batches", tags=["batches"])
 # ---------------------------------------------------------------------------
 def _handle_batch_error(err: BatchError) -> HTTPException:
     return HTTPException(status_code=err.code, detail=str(err))
+
+
+def _safe_filename(raw: str | None, fallback: str) -> str:
+    base = Path(raw or fallback).name.strip()
+    return base or fallback
+
+
+def _assert_batch_read_access(conn: sqlite3.Connection, batch_id: str, user: AuthUser) -> None:
+    row = conn.execute("SELECT owner_user_id FROM batches WHERE id = ?", (batch_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, f"Batch {batch_id} no encontrado")
+    ensure_owner_access(
+        user,
+        owner_user_id=row["owner_user_id"],
+        read_all_permission="batches:read:all",
+        read_own_permission="batches:read:own",
+    )
+
+
+def _assert_batch_write_access(conn: sqlite3.Connection, batch_id: str, user: AuthUser) -> None:
+    if not user.has_permission("batches:write"):
+        raise HTTPException(status_code=403, detail="Permiso insuficiente: batches:write")
+    _assert_batch_read_access(conn, batch_id, user)
+
+
+def _assert_batch_download_access(conn: sqlite3.Connection, batch_id: str, user: AuthUser) -> None:
+    row = conn.execute("SELECT owner_user_id FROM batches WHERE id = ?", (batch_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, f"Batch {batch_id} no encontrado")
+    ensure_owner_access(
+        user,
+        owner_user_id=row["owner_user_id"],
+        read_all_permission="download:all",
+        read_own_permission="download:own",
+    )
 
 
 def _batch_summary(conn: sqlite3.Connection, batch_id: str) -> BatchSummary:
@@ -127,7 +173,8 @@ def _mirror_outputs_to_storage(batch_id: str, out: dict) -> None:
     """
     try:
         storage_adapter = get_storage()
-    except Exception:
+    except Exception as exc:
+        logger.warning("No se pudo inicializar adapter de storage: %s", exc)
         return
 
     def _upload(path: Path) -> None:
@@ -136,10 +183,8 @@ def _mirror_outputs_to_storage(batch_id: str, out: dict) -> None:
         key = f"batch_{batch_id}/{path.name}"
         try:
             storage_adapter.put(BUCKET_OUTPUTS, key, path.read_bytes())
-        except Exception:
-            # Log via el logger del proyecto si se agrega en el futuro; por
-            # ahora silencioso para no romper generate.
-            pass
+        except Exception as exc:
+            logger.warning("Fallo mirror a storage (%s): %s", key, exc)
 
     consolidado = out.get("consolidado")
     if isinstance(consolidado, Path):
@@ -158,9 +203,15 @@ def _mirror_outputs_to_storage(batch_id: str, out: dict) -> None:
 @router.post("", response_model=BatchSummary, status_code=201)
 def create_batch(
     req: CreateBatchRequest,
+    user: AuthUser = Depends(require_permission("batches:write")),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchSummary:
-    batch_id = bcore.create_batch(conn, nombre=req.nombre, notas=req.notas)
+    batch_id = bcore.create_batch(
+        conn,
+        nombre=req.nombre,
+        notas=req.notas,
+        owner_user_id=user.user_id,
+    )
     return _batch_summary(conn, batch_id)
 
 
@@ -169,14 +220,23 @@ def list_batches(
     status: str | None = None,
     limit: int = 50,
     include_archived: bool = False,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> list[BatchSummary]:
     typed_status = status  # type: ignore[assignment]
+    owner_filter: int | None = None
+    if user.has_permission("batches:read:all"):
+        owner_filter = None
+    elif user.has_permission("batches:read:own"):
+        owner_filter = user.user_id
+    else:
+        raise HTTPException(status_code=403, detail="Permiso insuficiente para listar batches")
     rows = bcore.list_batches(
         conn,
         status=typed_status,  # type: ignore[arg-type]
         limit=limit,
         include_archived=include_archived,
+        owner_user_id=owner_filter,
     )
     return [_batch_summary(conn, r["id"]) for r in rows]
 
@@ -184,8 +244,10 @@ def list_batches(
 @router.get("/{batch_id}", response_model=BatchDetailResponse)
 def get_batch_detail(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchDetailResponse:
+    _assert_batch_read_access(conn, batch_id, user)
     summary = _batch_summary(conn, batch_id)
     pre_rows = bcore.list_pre_cortes(conn, batch_id)
     items = [BatchPreCorteItem(**r) for r in pre_rows]
@@ -196,8 +258,10 @@ def get_batch_detail(
 def patch_batch(
     batch_id: str,
     req: PatchBatchRequest,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchSummary:
+    _assert_batch_write_access(conn, batch_id, user)
     try:
         bcore.update_batch(conn, batch_id, nombre=req.nombre, notas=req.notas)
     except BatchError as err:
@@ -208,8 +272,10 @@ def patch_batch(
 @router.delete("/{batch_id}", status_code=204)
 def delete_batch(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> None:
+    _assert_batch_write_access(conn, batch_id, user)
     try:
         bcore.delete_batch(conn, batch_id)
     except BatchError as err:
@@ -219,8 +285,10 @@ def delete_batch(
 @router.post("/{batch_id}/archive", response_model=BatchSummary)
 def archive_batch(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchSummary:
+    _assert_batch_write_access(conn, batch_id, user)
     try:
         bcore.archive_batch(conn, batch_id)
     except BatchError as err:
@@ -235,36 +303,50 @@ def archive_batch(
 def upload_pre_cortes_to_batch(
     batch_id: str,
     files: list[UploadFile] = File(...),
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchDetailResponse:
     """Sube 1..N pre_cortes al batch. Cada archivo pasa por el mismo
     procesamiento del endpoint global `/files/upload-pre-corte`, y despues
     se linkea al batch.
     """
+    _assert_batch_write_access(conn, batch_id, user)
+    if len(files) > MAX_UPLOAD_FILES_PER_REQUEST:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Maximo {MAX_UPLOAD_FILES_PER_REQUEST} archivos por solicitud",
+        )
     try:
         bcore._require_editable(bcore._require_batch(conn, batch_id))
     except BatchError as err:
         raise _handle_batch_error(err) from err
 
     for f in files:
-        resp = _process_upload("pre_corte", f, conn)
+        resp = _process_upload(
+            "pre_corte",
+            f,
+            conn,
+            uploaded_by_user_id=user.user_id,
+        )
         try:
             bcore.add_pre_corte(conn, batch_id, resp.carga_id)
         except BatchError as err:
             raise _handle_batch_error(err) from err
-    return get_batch_detail(batch_id, conn)
+    return get_batch_detail(batch_id=batch_id, user=user, conn=conn)
 
 
 @router.post("/{batch_id}/pre-cortes/from-zip", response_model=ZipUploadResponse)
 def upload_pre_cortes_from_zip(
     batch_id: str,
     file: UploadFile = File(...),
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> ZipUploadResponse:
     """Sube un `.zip`, filtra los `.xlsx` que matcheen `FILENAME_PRE_CORTE_REGEX`,
     los procesa como pre_cortes y los linkea al batch. Retorna procesados +
     ignorados con motivo.
     """
+    _assert_batch_write_access(conn, batch_id, user)
     try:
         bcore._require_editable(bcore._require_batch(conn, batch_id))
     except BatchError as err:
@@ -276,16 +358,50 @@ def upload_pre_cortes_from_zip(
     regex = re.compile(FILENAME_PRE_CORTE_REGEX, flags=re.IGNORECASE)
     procesados = []
     ignorados = []
-    contenido = file.file.read()
+    contenido = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contenido) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"ZIP supera el limite permitido ({MAX_UPLOAD_BYTES} bytes)")
     try:
         zf = zipfile.ZipFile(io.BytesIO(contenido))
     except zipfile.BadZipFile as exc:
         raise HTTPException(422, f"ZIP invalido: {exc}") from exc
 
-    for name in zf.namelist():
-        base = Path(name).name
+    infos = zf.infolist()
+    if len(infos) > MAX_ZIP_ENTRIES:
+        raise HTTPException(413, f"ZIP excede el maximo de entradas ({MAX_ZIP_ENTRIES})")
+    total_uncompressed = 0
+
+    for info in infos:
+        name = info.filename
+        base = _safe_filename(name, "")
         if not base:
             continue
+        if info.is_dir():
+            continue
+        if info.file_size > MAX_UPLOAD_BYTES:
+            ignorados.append(
+                ZipUploadIgnorado(
+                    filename=base,
+                    motivo=f"tamano descomprimido excede limite ({MAX_UPLOAD_BYTES} bytes)",
+                )
+            )
+            continue
+        total_uncompressed += int(info.file_size)
+        if total_uncompressed > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES:
+            raise HTTPException(
+                413,
+                f"ZIP excede el total descomprimido permitido ({MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES} bytes)",
+            )
+        if info.compress_size > 0:
+            ratio = float(info.file_size) / float(info.compress_size)
+            if ratio > MAX_ZIP_COMPRESSION_RATIO:
+                ignorados.append(
+                    ZipUploadIgnorado(
+                        filename=base,
+                        motivo="entrada sospechosa (ratio de compresion excesivo)",
+                    )
+                )
+                continue
         if base.startswith(".") or "__MACOSX" in name:
             continue
         ext = Path(base).suffix.lower()
@@ -305,7 +421,12 @@ def upload_pre_cortes_from_zip(
         # Reusamos _process_upload envolviendo en un UploadFile-like.
         fake = _FakeUpload(base, data)
         try:
-            resp = _process_upload("pre_corte", fake, conn)  # type: ignore[arg-type]
+            resp = _process_upload(
+                "pre_corte",
+                fake,
+                conn,
+                uploaded_by_user_id=user.user_id,
+            )  # type: ignore[arg-type]
             bcore.add_pre_corte(conn, batch_id, resp.carga_id)
             procesados.append(resp)
         except HTTPException as exc:
@@ -327,8 +448,10 @@ class _FakeUpload:
 def remove_pre_corte_from_batch(
     batch_id: str,
     pre_corte_carga_id: int,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchDetailResponse:
+    _assert_batch_write_access(conn, batch_id, user)
     try:
         borrado = bcore.remove_pre_corte(conn, batch_id, pre_corte_carga_id)
     except BatchError as err:
@@ -338,7 +461,7 @@ def remove_pre_corte_from_batch(
             404,
             f"Pre_corte {pre_corte_carga_id} no estaba en el batch {batch_id}",
         )
-    return get_batch_detail(batch_id, conn)
+    return get_batch_detail(batch_id=batch_id, user=user, conn=conn)
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +473,7 @@ def upload_flash_to_batch(
     year: int,
     month: int,
     file: UploadFile = File(...),
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchDetailResponse:
     """Sube el flash mensual + declara el periodo (year/month).
@@ -357,12 +481,18 @@ def upload_flash_to_batch(
     Valida que el flash contenga facturas del periodo declarado. Si no
     coincide, retorna 422 con el rango real de fechas del flash.
     """
+    _assert_batch_write_access(conn, batch_id, user)
     try:
         bcore._require_editable(bcore._require_batch(conn, batch_id))
     except BatchError as err:
         raise _handle_batch_error(err) from err
 
-    resp = _process_upload("flash", file, conn)
+    resp = _process_upload(
+        "flash",
+        file,
+        conn,
+        uploaded_by_user_id=user.user_id,
+    )
 
     df = storage.load_parsed_df(resp.carga_id)
     ok, mensajes = validar_flash_periodo(df, year, month)
@@ -375,19 +505,21 @@ def upload_flash_to_batch(
         bcore.attach_flash(conn, batch_id, resp.carga_id, year, month)
     except BatchError as err:
         raise _handle_batch_error(err) from err
-    return get_batch_detail(batch_id, conn)
+    return get_batch_detail(batch_id=batch_id, user=user, conn=conn)
 
 
 @router.delete("/{batch_id}/flash", response_model=BatchDetailResponse)
 def detach_flash_from_batch(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchDetailResponse:
+    _assert_batch_write_access(conn, batch_id, user)
     try:
         bcore.detach_flash(conn, batch_id)
     except BatchError as err:
         raise _handle_batch_error(err) from err
-    return get_batch_detail(batch_id, conn)
+    return get_batch_detail(batch_id=batch_id, user=user, conn=conn)
 
 
 # ---------------------------------------------------------------------------
@@ -396,12 +528,14 @@ def detach_flash_from_batch(
 @router.get("/{batch_id}/preview", response_model=PreviewResponse)
 def preview_batch(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> PreviewResponse:
     """Ejecuta match en memoria sin persistir. Devuelve una fila por dia +
     colisiones detectadas + fechas no laborales saltadas + validacion del
     periodo del flash. `listo_para_confirmar` es el AND de todos.
     """
+    _assert_batch_read_access(conn, batch_id, user)
     b = bcore.get_batch(conn, batch_id)
     if not b:
         raise HTTPException(404, f"Batch {batch_id} no encontrado")
@@ -496,11 +630,13 @@ def preview_batch(
 @router.post("/{batch_id}/confirm", response_model=BatchSummary)
 def confirm_batch(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> BatchSummary:
     """Pasa el batch de `draft` a `ready_to_match`. Bloquea si hay colisiones
     o el flash no cuadra con el periodo declarado.
     """
+    _assert_batch_write_access(conn, batch_id, user)
     b = bcore.get_batch(conn, batch_id)
     if not b:
         raise HTTPException(404, f"Batch {batch_id} no encontrado")
@@ -508,7 +644,7 @@ def confirm_batch(
         raise HTTPException(
             409, f"Batch en estado '{b['status']}': solo 'draft' puede confirmarse"
         )
-    prev = preview_batch(batch_id, conn)
+    prev = preview_batch(batch_id, user, conn)
     if prev.colisiones:
         raise HTTPException(409, {
             "detail": "Hay colisiones de fecha_produccion; eliminar duplicados antes de confirmar",
@@ -529,6 +665,7 @@ def confirm_batch(
 @router.post("/{batch_id}/generate", response_model=GenerateResponse)
 def generate_batch(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> GenerateResponse:
     """Persiste el match de cada pre_corte contra el flash y genera todos
@@ -537,6 +674,7 @@ def generate_batch(
     Idempotente: si el batch ya esta `matched`, retorna los mismos archivos
     sin volver a persistir (no duplica cruce gracias a los UNIQUE de la BD).
     """
+    _assert_batch_write_access(conn, batch_id, user)
     b = bcore.get_batch(conn, batch_id)
     if not b:
         raise HTTPException(404, f"Batch {batch_id} no encontrado")
@@ -641,8 +779,10 @@ def _classify(filename: str) -> str:
 @router.get("/{batch_id}/downloads", response_model=DownloadsResponse)
 def list_downloads(
     batch_id: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ) -> DownloadsResponse:
+    _assert_batch_download_access(conn, batch_id, user)
     b = bcore.get_batch(conn, batch_id)
     if not b:
         raise HTTPException(404, f"Batch {batch_id} no encontrado")
@@ -671,6 +811,7 @@ def list_downloads(
 def download_file(
     batch_id: str,
     filename: str,
+    user: AuthUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(db_connection),
 ):
     """Descarga un archivo del batch.
@@ -682,6 +823,7 @@ def download_file(
     - Si no (LocalStorage o archivo no encontrado en Supabase), sirve el
       `FileResponse` del disco local con proteccion contra path traversal.
     """
+    _assert_batch_download_access(conn, batch_id, user)
     b = bcore.get_batch(conn, batch_id)
     if not b:
         raise HTTPException(404, f"Batch {batch_id} no encontrado")
@@ -697,9 +839,9 @@ def download_file(
                 signed = adapter.public_url(BUCKET_OUTPUTS, key, expires_in=86400)
                 if signed:
                     return RedirectResponse(url=signed, status_code=307)
-    except Exception:
-        # Cualquier error de Supabase -> fallback local silencioso.
-        pass
+    except Exception as exc:
+        # Cualquier error de Supabase -> fallback local.
+        logger.warning("Fallo descarga via Supabase, usando disco local: %s", exc)
 
     output_dir = Path(b["output_dir"]).resolve()
     target = (output_dir / filename).resolve()

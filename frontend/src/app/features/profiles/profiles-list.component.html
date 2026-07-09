@@ -1,0 +1,100 @@
+<div class="nutri-page nutri-stack">
+  <header class="nutri-page-header">
+    <div>
+      <p class="nutri-eyebrow">Plataforma de cruces</p>
+      <h1 class="nutri-page-header__title">Procesos de cruce</h1>
+      <p class="nutri-page-header__subtitle">
+        Cada proceso es un cruce de datos configurado con ayuda del equipo de
+        agentes: sube tus archivos, responde la entrevista y ejecuta.
+      </p>
+    </div>
+    <div class="nutri-page-header__actions">
+      <button mat-stroked-button type="button" (click)="reload()" matTooltip="Recargar">
+        <mat-icon>refresh</mat-icon>
+        Recargar
+      </button>
+      <a mat-flat-button color="primary" routerLink="/app/procesos/nuevo">
+        <mat-icon>add</mat-icon>
+        Nuevo proceso de cruce
+      </a>
+    </div>
+  </header>
+
+  <section class="nutri-card">
+    <div class="nutri-card-header">
+      <h2 class="nutri-section-title" style="margin: 0;">Procesos registrados</h2>
+    </div>
+
+    @if (loading()) {
+      <div class="nutri-loading">
+        <mat-spinner diameter="36"></mat-spinner>
+        <span>Cargando procesos...</span>
+      </div>
+    } @else if (error()) {
+      <div class="nutri-alert bad" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <div class="nutri-alert__body">
+          <p class="nutri-alert__title">No se pudo cargar el listado</p>
+          <p>{{ error() }}</p>
+        </div>
+      </div>
+    } @else if (profiles().length === 0) {
+      <div class="nutri-empty">
+        <div class="nutri-empty__icon"><mat-icon>hub</mat-icon></div>
+        <p class="nutri-empty__title">Aun no hay procesos de cruce</p>
+        <p class="nutri-empty__body">
+          Crea tu primer proceso: sube las dos fuentes de datos, cuenta a los
+          agentes que quieres medir y ellos proponen el cruce completo.
+        </p>
+        <a mat-flat-button color="primary" routerLink="/app/procesos/nuevo">
+          <mat-icon>add</mat-icon>
+          Crear primer proceso
+        </a>
+      </div>
+    } @else {
+      <div class="nutri-table-wrap">
+        <table class="nutri-table">
+          <thead>
+            <tr>
+              <th>Proceso</th>
+              <th class="num">Version</th>
+              <th>Status</th>
+              <th>Creado</th>
+              <th>Aprobado</th>
+              <th>Aprobado por</th>
+              <th style="width: 120px;">Accion</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of profiles(); track p.profile_id + '-' + p.version) {
+              <tr>
+                <td><strong>{{ p.profile_id }}</strong></td>
+                <td class="num">v{{ p.version }}</td>
+                <td>
+                  <span class="nutri-status" [class]="statusClass(p.status)">
+                    {{ statusLabel(p.status) }}
+                  </span>
+                </td>
+                <td class="nutri-muted">{{ (p.creado_en || '') | slice: 0:16 }}</td>
+                <td class="nutri-muted">
+                  @if (p.aprobado_en) {
+                    {{ p.aprobado_en | slice: 0:16 }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="nutri-muted">{{ p.aprobado_por || '—' }}</td>
+                <td>
+                  <a mat-stroked-button [routerLink]="['/app/procesos', p.profile_id]">
+                    <mat-icon>open_in_new</mat-icon>
+                    Abrir
+                  </a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>

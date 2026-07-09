@@ -1,0 +1,165 @@
+{
+  "name": "NutriAvicola - Run Profile (plataforma generica)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "run-profile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger-webhook",
+      "name": "Webhook: run-profile",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "run-profile"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/profiles/{{$json.body.profile_id}}/proposal",
+        "method": "GET",
+        "options": {
+          "response": { "response": { "neverError": true, "fullResponse": true } }
+        }
+      },
+      "id": "http-status",
+      "name": "GET /proposal (status)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.body.status.listo_para_aprobar}}",
+              "value2": true
+            }
+          ],
+          "number": [
+            { "value1": "={{$json.statusCode}}", "operation": "equal", "value2": 200 }
+          ]
+        },
+        "combineOperation": "all"
+      },
+      "id": "if-listo",
+      "name": "sin preguntas bloqueantes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/profiles/{{$('Webhook: run-profile').item.json.body.profile_id}}/run",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ parameters: $('Webhook: run-profile').item.json.body.parameters || {} }) }}",
+        "options": {
+          "response": { "response": { "neverError": true, "fullResponse": true } },
+          "timeout": 300000
+        }
+      },
+      "id": "http-run",
+      "name": "POST /run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [920, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{$json.statusCode}}", "operation": "equal", "value2": 200 }
+          ]
+        }
+      },
+      "id": "if-run-ok",
+      "name": "run ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1160, 240]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notif@nutriavicola.local",
+        "toEmail": "={{$env.NOTIF_EMAIL_TO}}",
+        "subject": "Cruce ejecutado - {{$('Webhook: run-profile').item.json.body.profile_id}}",
+        "text": "El cruce del proceso {{$('Webhook: run-profile').item.json.body.profile_id}} termino correctamente.\n\nResumen: {{JSON.stringify($json.body.summary)}}\nKPIs: {{JSON.stringify($json.body.kpis)}}\n\nPanel: {{$env.FRONTEND_URL}}/procesos/{{$('Webhook: run-profile').item.json.body.profile_id}}\n\nSistema NutriAvicola"
+      },
+      "id": "email-ok",
+      "name": "Email: exito",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1400, 180]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notif@nutriavicola.local",
+        "toEmail": "={{$env.NOTIF_EMAIL_TO}}",
+        "subject": "ERROR ejecutando cruce {{$('Webhook: run-profile').item.json.body.profile_id}}",
+        "text": "El cruce fallo o el profile no esta aprobado.\n\nStatus HTTP: {{$json.statusCode}}\nDetalle: {{JSON.stringify($json.body)}}\n\nRevisar: {{$env.FRONTEND_URL}}/procesos/{{$('Webhook: run-profile').item.json.body.profile_id}}"
+      },
+      "id": "email-fail",
+      "name": "Email: error",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1400, 340]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notif@nutriavicola.local",
+        "toEmail": "={{$env.NOTIF_EMAIL_TO}}",
+        "subject": "Cruce bloqueado - {{$('Webhook: run-profile').item.json.body.profile_id}} tiene preguntas sin responder",
+        "text": "Los agentes tienen preguntas bloqueantes abiertas para el proceso {{$('Webhook: run-profile').item.json.body.profile_id}}.\n\nResponderlas en el chat: {{$env.FRONTEND_URL}}/procesos/{{$('Webhook: run-profile').item.json.body.profile_id}}\n\nEl cruce NO se ejecuto (compromiso: cero supuestos bloqueantes sin confirmar)."
+      },
+      "id": "email-bloqueado",
+      "name": "Email: preguntas pendientes",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [920, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\": true, \"profile_id\": \"{{$('Webhook: run-profile').item.json.body.profile_id}}\"}"
+      },
+      "id": "response-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1640, 180]
+    }
+  ],
+  "connections": {
+    "Webhook: run-profile": {
+      "main": [[{ "node": "GET /proposal (status)", "type": "main", "index": 0 }]]
+    },
+    "GET /proposal (status)": {
+      "main": [[{ "node": "sin preguntas bloqueantes?", "type": "main", "index": 0 }]]
+    },
+    "sin preguntas bloqueantes?": {
+      "main": [
+        [{ "node": "POST /run", "type": "main", "index": 0 }],
+        [{ "node": "Email: preguntas pendientes", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /run": {
+      "main": [[{ "node": "run ok?", "type": "main", "index": 0 }]]
+    },
+    "run ok?": {
+      "main": [
+        [{ "node": "Email: exito", "type": "main", "index": 0 }],
+        [{ "node": "Email: error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Email: exito": {
+      "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

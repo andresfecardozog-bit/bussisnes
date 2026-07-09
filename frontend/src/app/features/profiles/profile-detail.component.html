@@ -1,0 +1,606 @@
+<div class="nutri-page nutri-stack">
+  <header class="nutri-page-header">
+    <div>
+      <p class="nutri-eyebrow">Proceso de cruce</p>
+      <h1 class="nutri-page-header__title">{{ profileId }}</h1>
+      <p class="nutri-page-header__subtitle">
+        Entrevista con los agentes y propuesta de MatchProfile.
+        @if (profileStatus(); as st) {
+          <span class="nutri-status" [class]="statusClass(st)">{{ statusLabel(st) }}</span>
+        }
+      </p>
+    </div>
+    <div class="nutri-page-header__actions">
+      <a mat-stroked-button routerLink="/procesos">
+        <mat-icon>arrow_back</mat-icon>
+        Volver al listado
+      </a>
+      <button mat-stroked-button type="button" (click)="loadAll()" matTooltip="Recargar todo">
+        <mat-icon>refresh</mat-icon>
+        Recargar
+      </button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="nutri-loading">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Cargando proceso...</span>
+    </div>
+  } @else {
+    <div class="detail-grid">
+
+      <!-- =============== COLUMNA IZQUIERDA: CHAT =============== -->
+      <section class="nutri-card nutri-card--flush chat-card">
+        <div class="chat-card__header">
+          <h2 class="nutri-section-title" style="margin: 0;">Entrevista</h2>
+          <span class="nutri-muted">Los agentes preguntan; tus respuestas quedan en la memoria del proceso.</span>
+        </div>
+
+        <div class="chat-thread">
+          @if (chat().length === 0) {
+            <div class="nutri-empty">
+              <div class="nutri-empty__icon"><mat-icon>forum</mat-icon></div>
+              <p class="nutri-empty__title">Sin mensajes todavia</p>
+              <p class="nutri-empty__body">
+                Cuando los agentes analicen los archivos, sus preguntas y notas
+                apareceran aqui.
+              </p>
+            </div>
+          }
+
+          @for (m of chat(); track $index) {
+            @if (m.tipo === 'pregunta') {
+              <!-- Pregunta de agente: card destacada -->
+              <div class="q-card" [class.q-card--bloqueante]="m.bloqueante">
+                <div class="q-card__head">
+                  <span class="agent-avatar"><mat-icon>{{ agentIcon(m.autor) }}</mat-icon></span>
+                  <span class="agent-name">{{ m.autor }}</span>
+                  @if (m.bloqueante) {
+                    <span class="nutri-badge bad">Bloqueante</span>
+                  } @else {
+                    <span class="nutri-badge info">No bloqueante</span>
+                  }
+                  @if (m.estado === 'respondida') {
+                    <span class="nutri-badge good">Respondida</span>
+                  } @else if (m.estado === 'asumida') {
+                    <span class="nutri-badge muted">Hipotesis asumida</span>
+                  }
+                </div>
+
+                <p class="q-card__pregunta">{{ m.contenido }}</p>
+
+                @if (m.hipotesis) {
+                  <details class="q-card__details">
+                    <summary>Hipotesis del agente</summary>
+                    <p>{{ m.hipotesis }}</p>
+                  </details>
+                }
+                @if (m.impacto) {
+                  <details class="q-card__details">
+                    <summary>Impacto de no responder</summary>
+                    <p>{{ m.impacto }}</p>
+                  </details>
+                }
+
+                @if (m.estado === 'abierta' && m.question_id != null) {
+                  <div class="q-card__answer">
+                    <input type="text" #ans class="chat-input"
+                           placeholder="Escribe tu respuesta..."
+                           (keydown.enter)="answerQuestion(m.question_id!, ans.value)" />
+                    <button mat-flat-button color="primary" type="button"
+                            [disabled]="acting()"
+                            (click)="answerQuestion(m.question_id!, ans.value)">
+                      Responder
+                    </button>
+                    @if (!m.bloqueante) {
+                      <button mat-stroked-button type="button"
+                              matTooltip="Aceptar la hipotesis del agente sin responder"
+                              [disabled]="acting()"
+                              (click)="assumeQuestion(m.question_id!)">
+                        Asumir hipotesis
+                      </button>
+                    }
+                  </div>
+                } @else if (m.respuesta) {
+                  <p class="q-card__respuesta">
+                    <mat-icon>reply</mat-icon>
+                    {{ m.respuesta }}
+                  </p>
+                }
+              </div>
+            } @else if (m.role === 'usuario') {
+              <!-- Mensaje del usuario: alineado a la derecha -->
+              <div class="msg msg--user">
+                <div class="msg__bubble msg__bubble--user">
+                  @if (m.tipo === 'brief') {
+                    <span class="msg__tag">Brief inicial</span>
+                  } @else if (m.tipo === 'correccion') {
+                    <span class="msg__tag">Correccion</span>
+                  }
+                  <p>{{ m.contenido }}</p>
+                </div>
+                <span class="msg__meta">{{ (m.timestamp || '') | slice: 0:16 }}</span>
+              </div>
+            } @else {
+              <!-- Mensaje de agente / sistema -->
+              <div class="msg">
+                <div class="msg__bubble">
+                  <span class="msg__author">
+                    <mat-icon>{{ agentIcon(m.autor) }}</mat-icon>
+                    {{ m.autor }}
+                  </span>
+                  <p>{{ m.contenido }}</p>
+                </div>
+                <span class="msg__meta">{{ (m.timestamp || '') | slice: 0:16 }}</span>
+              </div>
+            }
+          }
+        </div>
+
+        <div class="chat-composer">
+          <textarea #freeMsg rows="2" class="chat-input"
+                    placeholder="Agrega contexto libre para los agentes (se usara en la proxima re-propuesta)..."></textarea>
+          <button mat-flat-button color="primary" type="button"
+                  [disabled]="acting()" (click)="sendFreeMessage(freeMsg)">
+            <mat-icon>send</mat-icon>
+            Enviar
+          </button>
+        </div>
+      </section>
+
+      <!-- =============== COLUMNA DERECHA: PROPUESTA =============== -->
+      <section class="nutri-stack panel-col">
+
+        <div class="nutri-card">
+          <div class="nutri-card-header">
+            <h2 class="nutri-section-title" style="margin: 0;">Propuesta de cruce</h2>
+          </div>
+
+          @if (proposal(); as prop) {
+            <div class="status-row">
+              @if (prop.status.preguntas_bloqueantes > 0) {
+                <span class="nutri-badge bad">
+                  {{ prop.status.preguntas_bloqueantes }} bloqueante(s)
+                </span>
+              } @else {
+                <span class="nutri-badge good">Sin bloqueantes</span>
+              }
+              <span class="nutri-badge" [class]="prop.status.preguntas_abiertas > 0 ? 'warn' : 'muted'">
+                {{ prop.status.preguntas_abiertas }} pregunta(s) abierta(s)
+              </span>
+              <span class="nutri-badge info">Confianza {{ confianzaPct() }}</span>
+              <span class="nutri-badge muted">v{{ prop.profile.version }}</span>
+            </div>
+
+            <div class="nutri-actions panel-actions">
+              <input
+                type="file"
+                hidden
+                #homologInput
+                accept=".xlsx,.xls,.csv"
+                (change)="onHomologacionSelected($event)"
+              />
+              <button mat-stroked-button type="button" [disabled]="refining()"
+                      matTooltip="Re-correr a los agentes con la memoria actualizada"
+                      (click)="refine()">
+                @if (refining()) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <mat-icon>autorenew</mat-icon>
+                }
+                Re-proponer
+              </button>
+              <span [matTooltip]="bloqueantes() > 0
+                      ? 'Hay ' + bloqueantes() + ' pregunta(s) bloqueante(s) sin responder en el chat'
+                      : 'Aprobar esta version del profile'">
+                <button mat-flat-button color="primary" type="button"
+                        [disabled]="bloqueantes() > 0 || acting() || aprobado()"
+                        (click)="approve()">
+                  <mat-icon>task_alt</mat-icon>
+                  {{ aprobado() ? 'Aprobado' : 'Aprobar' }}
+                </button>
+              </span>
+              <span [matTooltip]="aprobado()
+                      ? 'Ejecutar el cruce con el motor deterministico'
+                      : 'Solo un profile aprobado puede ejecutarse'">
+                <button mat-stroked-button type="button"
+                        [disabled]="!aprobado() || running()"
+                        (click)="runCruce()">
+                  @if (running()) {
+                    <mat-spinner diameter="18"></mat-spinner>
+                  } @else {
+                    <mat-icon>play_arrow</mat-icon>
+                  }
+                  Ejecutar cruce
+                </button>
+              </span>
+              <span [matTooltip]="aprobado()
+                      ? 'Genera Excel corporativo y proyecto Power BI listos para descargar'
+                      : 'Aprueba el profile primero'">
+                <button mat-flat-button color="primary" type="button"
+                        [disabled]="!aprobado() || generating()"
+                        (click)="generateEntregables()">
+                  @if (generating()) {
+                    <mat-spinner diameter="18"></mat-spinner>
+                  } @else {
+                    <mat-icon>download</mat-icon>
+                  }
+                  Generar entregables
+                </button>
+              </span>
+              <button mat-button type="button" (click)="toggleTelemetry()">
+                <mat-icon>query_stats</mat-icon>
+                Telemetria
+              </button>
+              <button
+                mat-button
+                type="button"
+                [disabled]="uploadingHomologacion()"
+                matTooltip="Adjunta catalogos para traducir codigos en las salidas"
+                (click)="homologInput.click()"
+              >
+                @if (uploadingHomologacion()) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <mat-icon>upload_file</mat-icon>
+                }
+                Adjuntar homologacion
+              </button>
+            </div>
+
+            @if (showTelemetry()) {
+              @if (telemetry(); as t) {
+                <div class="nutri-alert info telemetry-box">
+                  <mat-icon>query_stats</mat-icon>
+                  <div class="nutri-alert__body">
+                    <p class="nutri-alert__title">Telemetria LLM del proceso</p>
+                    <ul>
+                      <li>{{ t.llamadas }} llamada(s) a Gemini</li>
+                      <li>{{ t.input_tokens | number }} tokens de entrada, {{ t.output_tokens | number }} de salida</li>
+                      <li>Costo estimado: {{ t.costo_usd | number:'1.4-4' }} USD</li>
+                      <li>Latencia media: {{ t.latencia_media_ms | number:'1.0-0' }} ms</li>
+                    </ul>
+                  </div>
+                </div>
+              } @else {
+                <div class="nutri-loading">
+                  <mat-spinner diameter="24"></mat-spinner>
+                  <span>Cargando telemetria...</span>
+                </div>
+              }
+            }
+
+            <!-- Resumen legible del profile -->
+            <div class="profile-summary">
+              <h3 class="nutri-eyebrow">Fuentes</h3>
+              <div class="source-block">
+                <p class="source-block__title">
+                  <span class="nutri-badge muted">Izquierda</span>
+                  <strong>{{ prop.profile.left.label }}</strong>
+                  <span class="nutri-muted">rol: {{ prop.profile.left.role }}</span>
+                </p>
+                <p class="nutri-muted">{{ loaderResumen(prop.profile.left.loader) }}</p>
+                @for (t of prop.profile.left.transforms ?? []; track $index) {
+                  <p class="transform-line"><mat-icon>subdirectory_arrow_right</mat-icon>{{ transformResumen(t) }}</p>
+                }
+              </div>
+              <div class="source-block">
+                <p class="source-block__title">
+                  <span class="nutri-badge muted">Derecha</span>
+                  <strong>{{ prop.profile.right.label }}</strong>
+                  <span class="nutri-muted">rol: {{ prop.profile.right.role }}</span>
+                </p>
+                <p class="nutri-muted">{{ loaderResumen(prop.profile.right.loader) }}</p>
+                @for (t of prop.profile.right.transforms ?? []; track $index) {
+                  <p class="transform-line"><mat-icon>subdirectory_arrow_right</mat-icon>{{ transformResumen(t) }}</p>
+                }
+              </div>
+
+              <h3 class="nutri-eyebrow">Keys de cruce</h3>
+              @for (k of prop.profile.join.keys; track $index) {
+                <p class="join-key">
+                  <code>{{ k.left }}</code>
+                  <mat-icon>sync_alt</mat-icon>
+                  <code>{{ k.right }}</code>
+                  @for (n of k.normalizers ?? []; track n) {
+                    <span class="nutri-badge muted">{{ n }}</span>
+                  }
+                </p>
+              }
+
+              <h3 class="nutri-eyebrow">KPIs</h3>
+              @for (k of prop.profile.kpis; track k.id) {
+                <div class="kpi-line">
+                  <strong>{{ k.label }}</strong>
+                  <span class="nutri-muted">{{ kpiFormula(k) }}</span>
+                  @if (k.semaforo) {
+                    <span class="nutri-badge good">verde >= {{ k.semaforo.verde_min }}</span>
+                    <span class="nutri-badge warn">amarillo >= {{ k.semaforo.amarillo_min }}</span>
+                  }
+                </div>
+              }
+
+              @if (prop.profile.service_level; as sl) {
+                <h3 class="nutri-eyebrow">Nivel de servicio</h3>
+                <div class="profile-box">
+                  <p class="nutri-muted">{{ serviceLevelResumen(sl) }}</p>
+                </div>
+              }
+
+              @if ((prop.profile.breakdowns ?? []).length > 0) {
+                <h3 class="nutri-eyebrow">Desgloses (breakdowns)</h3>
+                @for (bd of prop.profile.breakdowns ?? []; track bd.id) {
+                  <div class="profile-box">
+                    <p><strong>{{ breakdownResumen(bd) }}</strong></p>
+                    <div class="summary-chips">
+                      @for (m of breakdownMetricResumen(bd); track m) {
+                        <span class="nutri-badge muted">{{ m }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              }
+
+              @if (prop.profile.data_model; as dm) {
+                <h3 class="nutri-eyebrow">Modelo de datos</h3>
+                <div class="profile-box">
+                  <p><strong>{{ dataModelResumen(dm) }}</strong></p>
+                  <div class="summary-chips">
+                    @for (dim of dm.dimensions ?? []; track dim.name) {
+                      <span class="nutri-badge info">{{ dimResumen(dim) }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <mat-accordion class="json-accordion">
+              <mat-expansion-panel>
+                <mat-expansion-panel-header>
+                  <mat-panel-title>MatchProfile completo (JSON)</mat-panel-title>
+                </mat-expansion-panel-header>
+                <pre class="json-pre">{{ profileJson() }}</pre>
+              </mat-expansion-panel>
+            </mat-accordion>
+          } @else {
+            <div class="nutri-alert warn" role="alert">
+              <mat-icon>hourglass_empty</mat-icon>
+              <div class="nutri-alert__body">
+                <p class="nutri-alert__title">Todavia no hay una propuesta persistida</p>
+                <p>
+                  Si la creacion del proceso fallo, vuelve a intentarlo desde
+                  "Nuevo proceso de cruce" con el mismo identificador.
+                </p>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Diseno del reporte: propuesta + eleccion del usuario -->
+        @if (powerbiSpec(); as pbi) {
+          <div class="nutri-card">
+            <div class="nutri-card-header">
+              <h2 class="nutri-section-title" style="margin: 0;">Diseno del reporte Power BI</h2>
+            </div>
+            <p class="nutri-muted">
+              Esta es la propuesta del ReportDesigner. Puedes aceptarla tal
+              cual, ajustar las opciones o escribir tu propia respuesta; los
+              agentes la aplicaran al re-proponer.
+            </p>
+
+            <h3 class="nutri-eyebrow">Propuesta actual</h3>
+            <div class="nutri-stack" style="gap: 0.5rem;">
+              @for (page of pbi.pages; track page.name) {
+                <div class="profile-box design-page">
+                  <p>
+                    <strong>{{ page.name }}</strong>
+                    @if (page.proposito) {
+                      <span class="nutri-muted"> — {{ page.proposito }}</span>
+                    }
+                  </p>
+                  <p class="nutri-muted design-page__visuals">
+                    <mat-icon>insert_chart</mat-icon>
+                    {{ pageVisualsResumen(page) }}
+                  </p>
+                </div>
+              }
+            </div>
+
+            <h3 class="nutri-eyebrow">Ajusta a tu gusto</h3>
+            <div class="design-controls">
+              <div class="design-control">
+                <span class="design-control__label">Hojas / paginas</span>
+                <div class="design-stepper">
+                  <button mat-icon-button type="button" (click)="stepPaginas(-1)"
+                          [disabled]="designPaginas() <= 1">
+                    <mat-icon>remove</mat-icon>
+                  </button>
+                  <span class="design-stepper__value">{{ designPaginas() }}</span>
+                  <button mat-icon-button type="button" (click)="stepPaginas(1)"
+                          [disabled]="designPaginas() >= 10">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <div class="design-control">
+                <span class="design-control__label">Graficos por pagina</span>
+                <div class="design-stepper">
+                  <button mat-icon-button type="button" (click)="stepCharts(-1)"
+                          [disabled]="designCharts() <= 1">
+                    <mat-icon>remove</mat-icon>
+                  </button>
+                  <span class="design-stepper__value">{{ designCharts() }}</span>
+                  <button mat-icon-button type="button" (click)="stepCharts(1)"
+                          [disabled]="designCharts() >= 8">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="design-control">
+              <span class="design-control__label">Tipos de grafico preferidos</span>
+              <div class="design-chips">
+                @for (opt of visualKindOptions; track opt.kind) {
+                  <button type="button" class="design-chip"
+                          [class.design-chip--selected]="isTipoSelected(opt.kind)"
+                          (click)="toggleTipo(opt.kind)">
+                    <mat-icon>{{ opt.icon }}</mat-icon>
+                    {{ opt.label }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="design-control">
+              <span class="design-control__label">Tema de color</span>
+              <div class="design-chips">
+                @for (opt of themeOptions; track opt.value) {
+                  <button type="button" class="design-chip"
+                          [class.design-chip--selected]="designTheme() === opt.value"
+                          (click)="designTheme.set(opt.value)">
+                    <mat-icon>palette</mat-icon>
+                    {{ opt.label }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="design-control">
+              <span class="design-control__label">O escribe tu propia respuesta (opcional)</span>
+              <textarea #designNotas rows="2" class="chat-input design-notas"
+                        placeholder="Ej.: 'Quiero una hoja solo con el nivel de servicio en donut y barras, y otra con devoluciones en funnel'"></textarea>
+            </div>
+
+            <div class="nutri-actions nutri-actions--end">
+              <button mat-flat-button color="primary" type="button"
+                      [disabled]="sendingDesign()"
+                      (click)="submitDesign(designNotas)">
+                @if (sendingDesign()) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <mat-icon>design_services</mat-icon>
+                }
+                Enviar preferencias de diseno
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Resultado del cruce -->
+        @if (runResult(); as rr) {
+          <div class="nutri-card nutri-card--featured">
+            <div class="nutri-card-header">
+              <h2 class="nutri-section-title" style="margin: 0;">Resultado del cruce</h2>
+              @if (rr.run.reemplazado) {
+                <span class="nutri-badge muted">Run anterior reemplazado</span>
+              }
+            </div>
+            <div class="nutri-kpi-grid">
+              <div class="nutri-kpi nutri-kpi--good">
+                <div class="nutri-kpi__icon"><mat-icon>join_inner</mat-icon></div>
+                <div class="nutri-kpi__body">
+                  <span class="nutri-kpi__label">Cruzadas</span>
+                  <span class="nutri-kpi__value">{{ rr.summary.matched | number }}</span>
+                </div>
+              </div>
+              <div class="nutri-kpi nutri-kpi--warn">
+                <div class="nutri-kpi__icon"><mat-icon>west</mat-icon></div>
+                <div class="nutri-kpi__body">
+                  <span class="nutri-kpi__label">Solo izquierda</span>
+                  <span class="nutri-kpi__value">{{ rr.summary.solo_left | number }}</span>
+                </div>
+              </div>
+              <div class="nutri-kpi nutri-kpi--warn">
+                <div class="nutri-kpi__icon"><mat-icon>east</mat-icon></div>
+                <div class="nutri-kpi__body">
+                  <span class="nutri-kpi__label">Solo derecha</span>
+                  <span class="nutri-kpi__value">{{ rr.summary.solo_right | number }}</span>
+                </div>
+              </div>
+              <div class="nutri-kpi nutri-kpi--muted">
+                <div class="nutri-kpi__icon"><mat-icon>rule</mat-icon></div>
+                <div class="nutri-kpi__body">
+                  <span class="nutri-kpi__label">No cruzados</span>
+                  <span class="nutri-kpi__value">{{ rr.summary.no_cruzados | number }}</span>
+                </div>
+              </div>
+              @for (k of kpiList(rr.kpis); track k.id) {
+                <div class="nutri-kpi nutri-kpi--brand">
+                  <div class="nutri-kpi__icon"><mat-icon>insights</mat-icon></div>
+                  <div class="nutri-kpi__body">
+                    <span class="nutri-kpi__label">{{ k.id }}</span>
+                    <span class="nutri-kpi__value">{{ k.value }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Entregables descargables -->
+        @if (downloads().length > 0) {
+          <div class="nutri-card">
+            <div class="nutri-card-header">
+              <h2 class="nutri-section-title" style="margin: 0;">Entregables</h2>
+            </div>
+            <p class="nutri-muted">
+              Excel con la base de datos y proyecto Power BI (PBIP) generados
+              automaticamente. Descarga y abre en Excel / Power BI Desktop.
+            </p>
+            <div class="nutri-stack" style="gap: 0.5rem;">
+              @for (f of downloads(); track f.filename) {
+                <div class="downloads-file-row">
+                  <div>
+                    <strong>{{ f.filename }}</strong>
+                    <span class="nutri-muted"> — {{ f.kind }}, {{ f.size_bytes | number }} bytes</span>
+                  </div>
+                  <a mat-stroked-button color="primary" [href]="downloadHref(f.filename)" download>
+                    <mat-icon>download</mat-icon>
+                    Descargar
+                  </a>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Historial de ejecuciones -->
+        @if (runs().length > 0) {
+          <div class="nutri-card">
+            <div class="nutri-card-header">
+              <h2 class="nutri-section-title" style="margin: 0;">Historial de ejecuciones</h2>
+            </div>
+            <div class="nutri-table-wrap">
+              <table class="nutri-table">
+                <thead>
+                  <tr>
+                    <th>Ejecutado</th>
+                    <th class="num">Version</th>
+                    <th class="num">Cruzadas</th>
+                    <th class="num">No cruzados</th>
+                    <th>Archivos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of runs(); track r.id) {
+                    <tr>
+                      <td class="nutri-muted">{{ r.ejecutado_en | slice: 0:16 }}</td>
+                      <td class="num">v{{ r.profile_version }}</td>
+                      <td class="num">{{ r.summary.matched | number }}</td>
+                      <td class="num">{{ r.summary.no_cruzados | number }}</td>
+                      <td class="nutri-muted files-cell">
+                        {{ r.left_filename || '?' }} vs {{ r.right_filename || '?' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      </section>
+    </div>
+  }
+</div>

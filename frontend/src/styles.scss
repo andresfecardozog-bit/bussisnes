@@ -1,4 +1,4 @@
-// Fase 7C.2 - Tema corporativo NutriAvicola (rediseño 2026-07-06)
+// Fase 7C.3 - Tema corporativo Business Intelligen't (rediseño 2026-07-09)
 //
 // Sistema de diseño con tokens explícitos: paleta ampliada en shades,
 // spacing scale, escala tipográfica, elevación, radios y motion. Todo
@@ -7,8 +7,8 @@
 // siguen expuestos como aliases del nuevo sistema para no romper nada.
 //
 // Filosofía visual: sobria, corporativa, B2B. Superficies sólidas
-// (nada de glass / backdrop-filter). Elevación sutil. Bordes 1px.
-// Radios pequeños (4-8px). Naranja como acento, jamás como fondo
+// (nada de glass en pantallas operativas). Elevación sutil. Bordes 1px.
+// Radios pequeños (4-8px). Dorado como acento, jamás como fondo
 // dominante. El semáforo verde/amarillo/rojo se reserva para KPIs.
 
 @use '@angular/material' as mat;
@@ -31,27 +31,39 @@ html {
   // ---------------------------------------------------------------------------
   // Paleta corporativa (shades)
   // ---------------------------------------------------------------------------
-  --nutri-navy-50:  #E9EFF6;
-  --nutri-navy-100: #C8D6E4;
-  --nutri-navy-200: #94AFC7;
-  --nutri-navy-300: #5D82A8;
-  --nutri-navy-400: #2E5680;
-  --nutri-navy-500: #0F2E4C;
-  --nutri-navy-600: #0B2740;
-  --nutri-navy-700: #081A2C;
-  --nutri-navy-800: #051424;
-  --nutri-navy-900: #030D18;
+  --nutri-navy-50:  #EBEEFF;
+  --nutri-navy-100: #CDD5FC;
+  --nutri-navy-200: #A9B6F7;
+  --nutri-navy-300: #7C90EB;
+  --nutri-navy-400: #4E69D2;
+  --nutri-navy-500: #142C7A;
+  --nutri-navy-600: #0F2363;
+  --nutri-navy-700: #0B1A4B;
+  --nutri-navy-800: #081336;
+  --nutri-navy-900: #050B22;
 
-  --nutri-orange-50:  #FEF3E9;
-  --nutri-orange-100: #FDE0C4;
-  --nutri-orange-200: #FBC38B;
-  --nutri-orange-300: #F5A251;
-  --nutri-orange-400: #EF8A32;
-  --nutri-orange-500: #E87722;
-  --nutri-orange-600: #C7621B;
-  --nutri-orange-700: #A34D14;
-  --nutri-orange-800: #7D3B10;
-  --nutri-orange-900: #582808;
+  --nutri-orange-50:  #FFF8DE;
+  --nutri-orange-100: #FDEBBB;
+  --nutri-orange-200: #F8DA8A;
+  --nutri-orange-300: #F2C458;
+  --nutri-orange-400: #E6B73C;
+  --nutri-orange-500: #D4A017;
+  --nutri-orange-600: #B98810;
+  --nutri-orange-700: #9A6D0D;
+  --nutri-orange-800: #7A560A;
+  --nutri-orange-900: #5D4107;
+
+  // Alias explícito para usar semántica "gold" en nuevos componentes.
+  --nutri-gold-50:  var(--nutri-orange-50);
+  --nutri-gold-100: var(--nutri-orange-100);
+  --nutri-gold-200: var(--nutri-orange-200);
+  --nutri-gold-300: var(--nutri-orange-300);
+  --nutri-gold-400: var(--nutri-orange-400);
+  --nutri-gold-500: var(--nutri-orange-500);
+  --nutri-gold-600: var(--nutri-orange-600);
+  --nutri-gold-700: var(--nutri-orange-700);
+  --nutri-gold-800: var(--nutri-orange-800);
+  --nutri-gold-900: var(--nutri-orange-900);
 
   --nutri-gray-25:  #FCFCFD;
   --nutri-gray-50:  #F8F9FA;
@@ -189,10 +201,55 @@ html {
   // Motion tokens
   // ---------------------------------------------------------------------------
   --dur-fast:   100ms;
-  --dur-normal: 150ms;
-  --dur-slow:   250ms;
+  --dur-normal: 200ms;
+  --dur-slow:   350ms;
+  --dur-xslow:  600ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emph:     cubic-bezier(0.3, 0, 0, 1);
+  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  // ---------------------------------------------------------------------------
+  // Azul rey (brand primario para acciones — botón CTA, links activos)
+  // ---------------------------------------------------------------------------
+  --bi-royal-50:  #E8EFFA;
+  --bi-royal-100: #C5D5F3;
+  --bi-royal-200: #8FAEE8;
+  --bi-royal-300: #5888DE;
+  --bi-royal-400: #2F67D5;
+  --bi-royal-500: #123C7A;
+  --bi-royal-600: #0F3368;
+  --bi-royal-700: #0B2753;
+  --bi-royal-800: #081C3E;
+  --bi-royal-900: #04102A;
+
+  // Dorado (acento premium — datos estrella, huevo, logro)
+  --bi-gold-50:  #FEF8E7;
+  --bi-gold-100: #FDEEC4;
+  --bi-gold-200: #FBD97A;
+  --bi-gold-300: #F5C442;
+  --bi-gold-400: #E8B04B;
+  --bi-gold-500: #D99A2B;
+  --bi-gold-600: #C07A10;
+  --bi-gold-700: #A06B09;
+  --bi-gold-800: #7A4F06;
+  --bi-gold-900: #4E3204;
+
+  // Cáscara (fondo app — blanco cálido, no frío)
+  --bi-shell:     #FBF8F2;
+  --bi-shell-2:   #F5F1E9;
+
+  // Semántica nueva con tokens bi-*
+  --bi-primary:      var(--bi-royal-500);
+  --bi-primary-dark: var(--bi-royal-700);
+  --bi-gold:         var(--bi-gold-400);
+  --bi-gold-light:   var(--bi-gold-200);
+  --bi-gold-dark:    var(--bi-gold-700);
+  --bi-bg:           var(--bi-shell);
+
+  // Aliases gold para compatibilidad con código previo
+  --nutri-gold:      var(--bi-gold-400);
+  --nutri-gold-light:var(--bi-gold-200);
+  --nutri-gold-700:  var(--bi-gold-700);
 
   // ---------------------------------------------------------------------------
   // Override de tokens Material sys para toolbar/botones primarios

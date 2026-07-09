@@ -74,6 +74,13 @@ API_HOST = os.environ.get("NUTRI_API_HOST", "127.0.0.1")
 API_PORT = int(os.environ.get("PORT", os.environ.get("NUTRI_API_PORT", "8000")))
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def _parse_csv_env(name: str, default: list[str]) -> list[str]:
     raw = os.environ.get(name)
     if not raw:
@@ -90,6 +97,49 @@ API_CORS_ORIGINS = _parse_csv_env(
         "http://127.0.0.1:4200",
     ],
 )
+
+API_CORS_METHODS = _parse_csv_env(
+    "NUTRI_CORS_METHODS",
+    ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
+API_CORS_HEADERS = _parse_csv_env(
+    "NUTRI_CORS_HEADERS",
+    ["Authorization", "Content-Type", "X-CSRF-Token"],
+)
+
+APP_ENV = os.environ.get("NUTRI_ENV", "development").strip().lower()
+IS_PRODUCTION = APP_ENV in {"prod", "production"}
+ENABLE_API_DOCS = _env_bool("NUTRI_ENABLE_API_DOCS", not IS_PRODUCTION)
+
+# ---------------------------------------------------------------------------
+# Auth / sesiones / RBAC
+# ---------------------------------------------------------------------------
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@nutriavicola.local").strip().lower()
+ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_INITIAL_PASSWORD")
+
+AUTH_COOKIE_NAME = os.environ.get("NUTRI_AUTH_COOKIE_NAME", "nutri_session")
+CSRF_COOKIE_NAME = os.environ.get("NUTRI_CSRF_COOKIE_NAME", "nutri_csrf")
+AUTH_COOKIE_DOMAIN = os.environ.get("NUTRI_AUTH_COOKIE_DOMAIN") or None
+AUTH_COOKIE_SAMESITE = os.environ.get("NUTRI_AUTH_COOKIE_SAMESITE", "none").strip().lower()
+if AUTH_COOKIE_SAMESITE not in {"lax", "strict", "none"}:
+    AUTH_COOKIE_SAMESITE = "none"
+AUTH_COOKIE_SECURE = _env_bool("NUTRI_AUTH_COOKIE_SECURE", IS_PRODUCTION)
+
+LOGIN_MAX_ATTEMPTS = int(os.environ.get("NUTRI_LOGIN_MAX_ATTEMPTS", "5"))
+LOGIN_LOCK_MINUTES = int(os.environ.get("NUTRI_LOGIN_LOCK_MINUTES", "15"))
+LOGIN_SESSION_IDLE_MINUTES = int(os.environ.get("NUTRI_SESSION_IDLE_MINUTES", "60"))
+LOGIN_SESSION_ABSOLUTE_HOURS = int(os.environ.get("NUTRI_SESSION_ABSOLUTE_HOURS", "12"))
+
+# ---------------------------------------------------------------------------
+# Seguridad de uploads (DoS + zip bomb)
+# ---------------------------------------------------------------------------
+MAX_UPLOAD_BYTES = int(os.environ.get("NUTRI_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+MAX_UPLOAD_FILES_PER_REQUEST = int(os.environ.get("NUTRI_MAX_UPLOAD_FILES", "50"))
+MAX_ZIP_ENTRIES = int(os.environ.get("NUTRI_MAX_ZIP_ENTRIES", "200"))
+MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = int(
+    os.environ.get("NUTRI_MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES", str(250 * 1024 * 1024))
+)
+MAX_ZIP_COMPRESSION_RATIO = float(os.environ.get("NUTRI_MAX_ZIP_RATIO", "100"))
 
 # ---------------------------------------------------------------------------
 # Supabase (opcional, Fase 7E). Si no estan definidas -> LocalStorage.
@@ -164,3 +214,7 @@ CUMPLIMIENTO_SEMAFORO = {
 
 # Reservado para Fase futura (fallback opcional). NO se usa en el core.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or None
+
+# Modelo Gemini para la capa de agentes (Fase 2+). Alias rolling por defecto
+# para no depender de una version puntual que Google pueda retirar.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
