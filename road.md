@@ -401,6 +401,15 @@ esta terminado.
   logout en shell. Verificacion: `pytest` completo 366/366 verde y
   `npm run build` Angular verde.
 
+- 2026-07-09 (12): Bloque 7 de seguridad (admin) completado: `auth.py` ahora
+  expone gestion de identidades y roles (`GET /auth/roles`, `GET /auth/users`,
+  `POST /auth/users`, `PATCH /auth/users/{id}`) con `users:manage`, asignacion
+  de roles dinamica y reset de contrasena temporal con cambio forzado.
+  Se agrego auditoria minima (`audit_log`) para login/logout, cambio de
+  contrasena, creacion/revocacion de service tokens y administracion de
+  usuarios. Pruebas nuevas en `tests/test_security_auth.py` y regresion completa
+  367/367 verde.
+
 - 2026-07-09 (10): Rediseño completo del frontend aprobado. Stack: Angular
   22 (sin migración). Estructura: landing pública en `/`, app privada en
   `/app/*` con AppShellComponent (sidebar navy nuevo). Cambios principales:

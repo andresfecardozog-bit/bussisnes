@@ -15,8 +15,10 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
+from app.api.rate_limit import is_request_allowed
 from app.api.routes import auth
 from app.api.routes import (
     batches,
@@ -93,6 +95,13 @@ def health() -> HealthResponse:
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
+    if not is_request_allowed(request):
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Demasiadas solicitudes; intenta de nuevo en unos minutos."
+            },
+        )
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")

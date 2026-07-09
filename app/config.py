@@ -142,6 +142,15 @@ MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = int(
 MAX_ZIP_COMPRESSION_RATIO = float(os.environ.get("NUTRI_MAX_ZIP_RATIO", "100"))
 
 # ---------------------------------------------------------------------------
+# Rate limiting (anti abuso / costos LLM)
+# ---------------------------------------------------------------------------
+RATE_LIMIT_LOGIN_PER_MINUTE = int(os.environ.get("NUTRI_RATE_LIMIT_LOGIN_PER_MINUTE", "20"))
+RATE_LIMIT_HEAVY_PER_10MIN = int(os.environ.get("NUTRI_RATE_LIMIT_HEAVY_PER_10MIN", "60"))
+if "PYTEST_VERSION" in os.environ:
+    RATE_LIMIT_LOGIN_PER_MINUTE = 100000
+    RATE_LIMIT_HEAVY_PER_10MIN = 100000
+
+# ---------------------------------------------------------------------------
 # Supabase (opcional, Fase 7E). Si no estan definidas -> LocalStorage.
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or None
