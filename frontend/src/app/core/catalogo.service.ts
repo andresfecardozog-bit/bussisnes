@@ -46,10 +46,12 @@ export class CatalogoService {
 
   ejecutar(
     skillId: string, lefts: File[], rights: File[], modo: 'consolidado' | 'individual',
+    homologacion?: File | null,
   ): Observable<EjecutarResponse> {
     const fd = new FormData();
     for (const f of lefts) fd.append('left_files', f, f.name);
     for (const f of rights) fd.append('right_files', f, f.name);
+    if (homologacion) fd.append('homologacion_file', homologacion, homologacion.name);
     fd.append('modo', modo);
     return this.http
       .post<{ job_id: string }>(`${this.base}/${skillId}/ejecutar`, fd)

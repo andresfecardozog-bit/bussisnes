@@ -24,7 +24,9 @@ export class CatalogoRunComponent {
 
   leftFiles = signal<File[]>([]);
   rightFiles = signal<File[]>([]);
+  homologacionFile = signal<File | null>(null);
   modo = signal<'consolidado' | 'individual'>('consolidado');
+  readonly esPreCorte = this.skillId === 'pre_corte';
   busy = signal(false);
   error = signal<string | null>(null);
   result = signal<EjecutarResponse | null>(null);
@@ -47,6 +49,12 @@ export class CatalogoRunComponent {
     else this.rightFiles.set(files);
   }
 
+  onHomologacion(evt: Event): void {
+    const input = evt.target as HTMLInputElement;
+    this.homologacionFile.set((input.files ?? [])[0] ?? null);
+    input.value = '';
+  }
+
   setModo(m: 'consolidado' | 'individual'): void { this.modo.set(m); }
 
   submit(): void {
@@ -55,7 +63,10 @@ export class CatalogoRunComponent {
     this.error.set(null);
     this.result.set(null);
     this.downloads.set([]);
-    this.svc.ejecutar(this.skillId, this.leftFiles(), this.rightFiles(), this.modo()).subscribe({
+    this.svc.ejecutar(
+      this.skillId, this.leftFiles(), this.rightFiles(), this.modo(),
+      this.homologacionFile(),
+    ).subscribe({
       next: (res) => {
         this.result.set(res);
         this.svc.descargas(res.run_token).subscribe({

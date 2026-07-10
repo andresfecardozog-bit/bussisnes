@@ -136,3 +136,25 @@ def test_catalogo_pre_corte_reusa_exportador_legado(client):
     dl = client.get(f"/catalogo/descargas/{body['run_token']}")
     assert dl.status_code == 200
     assert any(a["path"].endswith(".xlsx") for a in dl.json()["archivos"])
+
+
+@pytest.mark.skipif(
+    not (PRE_CORTE.exists() and FLASH.exists() and HOMOLOG.exists()),
+    reason="faltan fixtures PRE CORTE/FLASH/homologacion",
+)
+def test_catalogo_pre_corte_con_homologacion_adjunta(client):
+    """Sin poblar el catalogo antes: la homologacion adjunta lo puebla y el
+    PRE CORTE resuelve materiales y produce el Excel legado."""
+    with PRE_CORTE.open("rb") as f1, FLASH.open("rb") as f2, HOMOLOG.open("rb") as f3:
+        resp = client.post(
+            "/catalogo/pre_corte/ejecutar",
+            data={"modo": "consolidado"},
+            files=[
+                ("left_files", ("PRE CORTE 13.02.2026.xlsx", f1, "application/vnd.ms-excel")),
+                ("right_files", ("flash.csv", f2, "text/csv")),
+                ("homologacion_file", ("homologacion.xlsx", f3, "application/vnd.ms-excel")),
+            ],
+        )
+    status, body = _wait_job(client, resp)
+    assert status == 200, body
+    assert any(a.endswith(".xlsx") for a in body["resultados"][0]["archivos"])

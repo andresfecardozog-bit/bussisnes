@@ -127,7 +127,8 @@ def _kpis_legacy(result: Any) -> dict[str, Any]:
 
 
 def _ejecutar_pre_corte_legacy(
-    pre_cortes: list[Path], flashes: list[Path], modo: str, out_dir: Path
+    pre_cortes: list[Path], flashes: list[Path], modo: str, out_dir: Path,
+    homologacion: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Reutiliza el pipeline y el exportador LEGADO (verificado) para PRE CORTE
     vs FLASH: carga -> cruce por material via catalogo SAP -> persiste en el
@@ -143,6 +144,18 @@ def _ejecutar_pre_corte_legacy(
     from app.core.exporters import export_cumplimiento_diario, export_cumplimiento_xlsx
     from app.core.loaders import load_flash, load_pre_corte
     from app.core.matcher import match_by_material
+    from app.core.sku_catalog import import_from_homologacion
+
+    # Si el usuario adjunta la homologacion maestra, se importa al catalogo SKU
+    # ANTES de cargar el PRE CORTE (que resuelve materiales contra ese catalogo).
+    if homologacion is not None:
+        try:
+            with _legacy_conn() as conn:
+                import_from_homologacion(homologacion, conn)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=422, detail=f"Homologacion invalida: {exc}"
+            ) from exc
 
     if len(flashes) != 1:
         raise HTTPException(
@@ -281,6 +294,7 @@ async def ejecutar_catalogo(
     skill_id: str,
     left_files: list[UploadFile] = File(...),
     right_files: list[UploadFile] = File(...),
+    homologacion_file: UploadFile | None = File(default=None),
     modo: str = Form("consolidado"),
     user: AuthUser = Depends(current_user),
 ) -> dict[str, Any]:
@@ -316,6 +330,9 @@ async def ejecutar_catalogo(
     # de que la peticion responde); el cruce+render pesado va al job.
     lefts = _save_uploads(up_dir, left_files, "left")
     rights = _save_uploads(up_dir, right_files, "right")
+    homolog_path: Path | None = None
+    if homologacion_file and homologacion_file.filename:
+        homolog_path = _save_uploads(up_dir, [homologacion_file], "homolog")[0]
 
     def _trabajo() -> dict[str, Any]:
         resultados: list[dict[str, Any]] = []
@@ -323,7 +340,9 @@ async def ejecutar_catalogo(
             if skill_id == "pre_corte":
                 # PRE CORTE reutiliza el pipeline + exportador legado (paridad
                 # exacta con el MVP verificado), no el motor generico.
-                resultados = _ejecutar_pre_corte_legacy(lefts, rights, modo, out_dir)
+                resultados = _ejecutar_pre_corte_legacy(
+                    lefts, rights, modo, out_dir, homolog_path
+                )
             elif modo == "consolidado":
                 result = run_profile_multi(profile, lefts, rights)
                 resultados.append(

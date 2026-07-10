@@ -80,6 +80,27 @@
         </div>
       </div>
 
+      @if (esPreCorte) {
+        <div class="file-slot" [class.file-slot--filled]="homologacionFile()">
+          <p class="nutri-eyebrow">Homologacion / catalogo maestro (opcional)</p>
+          <p class="nutri-muted">
+            Tabla que traduce codigos de material a SAP. Necesaria si el PRE CORTE
+            no trae la hoja NOTIFICACION o el catalogo aun no esta poblado.
+          </p>
+          <input type="file" hidden #homologInput accept=".xlsx,.xls,.csv"
+                 (change)="onHomologacion($event)" />
+          <div class="nutri-actions">
+            <button mat-stroked-button type="button" (click)="homologInput.click()">
+              <mat-icon>upload_file</mat-icon>
+              {{ homologacionFile() ? 'Cambiar archivo' : 'Adjuntar homologacion' }}
+            </button>
+            @if (homologacionFile(); as f) {
+              <span class="nutri-badge info">{{ f.name }}</span>
+            }
+          </div>
+        </div>
+      }
+
       @if (modo() === 'individual') {
         <p class="nutri-muted">
           <mat-icon style="vertical-align:middle;font-size:18px;">info</mat-icon>
