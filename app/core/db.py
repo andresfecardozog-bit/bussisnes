@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 import pandas as pd
 
-from app.config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, DB_PATH
+from app.config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, DB_PATH, FORCE_ADMIN_RESET
 from app.security.passwords import hash_password, new_token
 
 if TYPE_CHECKING:
@@ -398,7 +398,31 @@ def _bootstrap_admin(conn: sqlite3.Connection) -> int:
         (ADMIN_EMAIL.lower(),),
     ).fetchone()
     if admin:
-        return int(admin["id"])
+        admin_id = int(admin["id"])
+        if FORCE_ADMIN_RESET and ADMIN_INITIAL_PASSWORD:
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                """
+                UPDATE users
+                SET password_hash = ?,
+                    is_active = 1,
+                    must_change_pwd = 0,
+                    failed_attempts = 0,
+                    locked_until = NULL,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (hash_password(ADMIN_INITIAL_PASSWORD), now, admin_id),
+            )
+        role_row = conn.execute(
+            "SELECT id FROM roles WHERE code = 'admin'"
+        ).fetchone()
+        if role_row:
+            conn.execute(
+                "INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
+                (admin_id, int(role_row["id"])),
+            )
+        return admin_id
     initial_password = ADMIN_INITIAL_PASSWORD or new_token(16)
     now = datetime.now(timezone.utc).isoformat()
     cur = conn.execute(

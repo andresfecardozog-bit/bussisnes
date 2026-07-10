@@ -116,6 +116,7 @@ ENABLE_API_DOCS = _env_bool("NUTRI_ENABLE_API_DOCS", not IS_PRODUCTION)
 # ---------------------------------------------------------------------------
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@nutriavicola.local").strip().lower()
 ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_INITIAL_PASSWORD")
+FORCE_ADMIN_RESET = _env_bool("NUTRI_FORCE_ADMIN_RESET", False)
 
 AUTH_COOKIE_NAME = os.environ.get("NUTRI_AUTH_COOKIE_NAME", "nutri_session")
 CSRF_COOKIE_NAME = os.environ.get("NUTRI_CSRF_COOKIE_NAME", "nutri_csrf")
