@@ -389,3 +389,37 @@ def test_division_por_cero_da_nan_no_explota(tmp_path):
 
     assert pd.isna(result.matched.iloc[0]["cumpl"])
     assert result.kpis["cumpl_global"] is None
+
+
+def test_group_by_sum_tolera_valores_no_numericos():
+    """Un group_by con sum sobre una columna que trae basura de texto
+    ('CC55', vacios) no debe reventar con 'could not convert string to
+    float': los valores no numericos se coercionan a NaN antes de sumar."""
+    import pandas as pd
+
+    from app.platform.engine import _apply_transform
+    from app.platform.profile import GroupByAggregate
+
+    df = pd.DataFrame(
+        {
+            "orden": ["A", "A", "B", "B"],
+            "cantidad": ["10", "CC55", "5", ""],
+            "desc": ["x", "y", "z", "w"],
+        }
+    )
+    transform = GroupByAggregate.model_validate(
+        {
+            "op": "group_by_aggregate",
+            "by": ["orden"],
+            "aggregations": [
+                {"target": "total", "source": "cantidad", "fn": "sum"},
+                {"target": "desc", "source": "desc", "fn": "first"},
+            ],
+        }
+    )
+    out = _apply_transform(df, transform, {})
+    total = {r["orden"]: r["total"] for _, r in out.iterrows()}
+    assert total["A"] == 10.0  # 'CC55' -> NaN, no rompe
+    assert total["B"] == 5.0   # '' -> NaN
+    # 'first' sobre la columna de texto no se ve afectado por la coercion
+    assert set(out["desc"]) == {"x", "z"}

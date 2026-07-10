@@ -11,9 +11,11 @@ export interface AuthMeResponse {
   ok: boolean;
   user: AuthUser;
   auth_kind: string;
+  csrf_token?: string;
 }
 
 export interface AuthLoginResponse {
   ok: boolean;
   user: AuthUser;
+  csrf_token?: string;
 }

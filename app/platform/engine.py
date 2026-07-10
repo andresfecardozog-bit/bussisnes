@@ -161,14 +161,26 @@ def _apply_transform(
         if df.empty:
             cols = list(transform.by) + [a.target for a in transform.aggregations]
             return pd.DataFrame(columns=cols)
+        # Las agregaciones numericas (sum/mean) deben tolerar valores sucios
+        # en columnas que el mapeo trajo como texto (ej. 'CC55' en una columna
+        # de cantidad). Sin esto, pandas intenta sumar strings y lanza
+        # "could not convert string to float". Se coerciona a numerico
+        # (no numerico -> NaN) en una columna TEMPORAL por agregacion, para no
+        # afectar a un first/max/min que use la misma columna origen.
+        df = df.copy()
+        numericas = {AggFn.SUM, AggFn.MEAN}
         named: dict[str, tuple[str, str]] = {}
-        for agg in transform.aggregations:
+        for i, agg in enumerate(transform.aggregations):
             if agg.source not in df.columns:
                 raise ValueError(
                     f"group_by_aggregate: columna source inexistente '{agg.source}'"
                 )
             fn = "count" if agg.fn == AggFn.COUNT else agg.fn.value
-            named[agg.target] = (agg.source, fn)
+            source = agg.source
+            if agg.fn in numericas:
+                source = f"__num_{i}_{agg.source}"
+                df[source] = pd.to_numeric(df[agg.source], errors="coerce")
+            named[agg.target] = (source, fn)
         out = df.groupby(transform.by, as_index=False, dropna=False).agg(**named)
         return out
 

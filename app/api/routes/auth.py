@@ -260,6 +260,11 @@ def post_login(
     return {
         "ok": True,
         "user": _user_identity(conn, int(row["id"])),
+        # Se devuelve el token CSRF en el body ademas de la cookie: en un
+        # deploy cross-site (frontend Vercel + backend Railway) el JS del
+        # frontend NO puede leer la cookie CSRF (es de otro dominio), asi que
+        # necesita el token por respuesta para mandarlo en X-CSRF-Token.
+        "csrf_token": csrf_token,
     }
 
 
@@ -296,6 +301,9 @@ def get_me(
         "ok": True,
         "user": _user_identity(conn, user.user_id),
         "auth_kind": user.auth_kind,
+        # Permite re-obtener el token CSRF tras un refresh de pagina (la
+        # sesion sigue viva por cookie) sin forzar re-login.
+        "csrf_token": user.csrf_token,
     }
 
 
@@ -350,7 +358,11 @@ def post_change_password(
         user_id=user.user_id,
         ip=request.client.host if request.client else None,
     )
-    return {"ok": True, "user": _user_identity(conn, user.user_id)}
+    return {
+        "ok": True,
+        "user": _user_identity(conn, user.user_id),
+        "csrf_token": csrf_token,
+    }
 
 
 @router.get("/tokens")

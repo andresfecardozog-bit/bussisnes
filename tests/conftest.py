@@ -20,6 +20,21 @@ if str(PROJECT_ROOT) not in sys.path:
 # Marca para que app.config._load_dotenv_if_present() se salte el .env real.
 os.environ.setdefault("PYTEST_VERSION", "true")
 
+# Los tests NUNCA deben correr en modo produccion: si el shell donde se
+# invoca pytest tiene variables de deploy filtradas (NUTRI_ENV=production,
+# cookies Secure, etc.), el gate de seguridad de main.py aborta el arranque
+# de la app en los TestClient. Se neutralizan ANTES de importar app.config
+# (que lee estos valores a nivel de modulo).
+for _var in (
+    "NUTRI_ENV",
+    "NUTRI_ENABLE_API_DOCS",
+    "NUTRI_AUTH_COOKIE_SECURE",
+    "NUTRI_AUTH_COOKIE_SAMESITE",
+    "ADMIN_INITIAL_PASSWORD",
+):
+    os.environ.pop(_var, None)
+os.environ["NUTRI_ENV"] = "development"
+
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_XLSX = FIXTURES / "PRE_CORTE_muestra.xlsx"
 HOMOLOG_XLSX = FIXTURES / "homologacion.xlsx"

@@ -116,8 +116,11 @@ LOGO_SOURCE = Path(__file__).resolve().parents[2] / "resources" / "image_7205088
 MATCHED_TABLE = "matched"
 NO_CRUZADOS_TABLE = "no_cruzados"
 
-# Tablas chicas (dims/breakdowns) con menos filas que esto van embebidas.
-INLINE_MAX_ROWS = 1000
+# Portabilidad: por defecto TODAS las tablas van embebidas (patron Enter Data),
+# para que el PBIP se comparta como zip y abra en cualquier maquina sin
+# configurar rutas. Solo las tablas gigantescas (por encima de este umbral)
+# caen al fallback CSV + parametro RutaDatos, que si requiere ajustar la ruta.
+INLINE_MAX_ROWS = 300000
 
 _NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 
@@ -814,7 +817,12 @@ def _write_semantic_model(
         "database\n\tcompatibilityLevel: 1550\n", encoding="utf-8"
     )
 
-    query_order = json.dumps(["RutaDatos", *frames.keys()])
+    # RutaDatos (parametro de carpeta) solo hace falta si queda alguna tabla
+    # fuera de inline (fallback CSV). Con todo embebido, el modelo no depende
+    # de ninguna ruta y el PBIP es 100% portable.
+    usa_csv = any(name not in inline_tables for name in frames)
+    orden = (["RutaDatos"] if usa_csv else []) + list(frames.keys())
+    query_order = json.dumps(orden)
     model_lines = [
         "model Model",
         "\tculture: es-CO",
@@ -847,16 +855,25 @@ def _write_semantic_model(
             "\n".join(rel_lines), encoding="utf-8"
         )
 
-    # Parametro de ruta: apunta por defecto a la carpeta data/ del proyecto.
-    ruta_default = str(data_dir.resolve()).replace("\\", "\\\\")
-    expressions = (
-        f'expression RutaDatos = "{ruta_default}" '
-        'meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]\n'
-        f"\tlineageTag: {_tag('expression', 'RutaDatos')}\n"
-        "\n"
-        "\tannotation PBI_ResultType = Text\n"
-    )
-    (definition / "expressions.tmdl").write_text(expressions, encoding="utf-8")
+    # Parametro de ruta: solo se emite si hay tablas en fallback CSV. Apunta
+    # por defecto a la carpeta data/ del proyecto (ruta absoluta de generacion;
+    # el usuario la ajusta si mueve el proyecto). Con todo embebido no se emite.
+    if usa_csv:
+        ruta_default = str(data_dir.resolve()).replace("\\", "\\\\")
+        expressions = (
+            f'expression RutaDatos = "{ruta_default}" '
+            'meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]\n'
+            f"\tlineageTag: {_tag('expression', 'RutaDatos')}\n"
+            "\n"
+            "\tannotation PBI_ResultType = Text\n"
+        )
+        (definition / "expressions.tmdl").write_text(expressions, encoding="utf-8")
+    else:
+        # Regeneracion sobre una carpeta previa (no-portable): elimina el
+        # parametro de ruta viejo para que no quede una ruta absoluta muerta.
+        stale = definition / "expressions.tmdl"
+        if stale.exists():
+            stale.unlink()
 
     for name, df in frames.items():
         (tables_dir / f"{name}.tmdl").write_text(
@@ -1936,12 +1953,12 @@ def render_pbip(
     # breakdowns): construirlas ANTES de escribir el semantic model.
     sections = _build_sections(spec, profile, registry, frames, fact_name)
 
-    dim_tables = (
-        {d.name for d in profile.data_model.dimensions} if profile.data_model else set()
-    )
+    # Portabilidad: se embeben TODAS las tablas cuyo tamano este por debajo del
+    # umbral (incluido el fact y matched/no_cruzados). Asi el zip abre en
+    # cualquier maquina sin configurar RutaDatos. Solo tablas gigantescas caen
+    # al fallback CSV.
     inline_tables = {
-        t for t in (dim_tables | breakdown_tables)
-        if t in frames and len(frames[t]) < INLINE_MAX_ROWS
+        t for t, df in frames.items() if len(df) < INLINE_MAX_ROWS
     }
 
     data_dir = output_dir / "data"
@@ -2011,7 +2028,24 @@ def _readme_text(
         origen = "embebida en el modelo" if t in inline_tables else "CSV en data/"
         filas_tabla.append(f"- `{t}` ({len(df)} filas, {origen})")
     tablas = "\n".join(filas_tabla)
-    return (
+    usa_csv = any(t not in inline_tables for t in frames)
+
+    apertura_portable = (
+        f"# Reporte Power BI: {name}\n"
+        "\n"
+        "## Como abrir (2 pasos)\n"
+        "\n"
+        f"1. Doble clic al archivo `{name}.pbip` (se abre Power BI Desktop).\n"
+        "2. Clic en el boton **Actualizar** (Refresh) de la cinta **Inicio**.\n"
+        "\n"
+        "Listo. Todos los datos van embebidos dentro del modelo, asi que\n"
+        "puedes comprimir esta carpeta y compartirla: abre en cualquier\n"
+        "computador sin configurar rutas ni parametros.\n"
+        "\n"
+        "## Datos del modelo\n"
+    )
+
+    apertura_csv = (
         f"# Reporte Power BI: {name}\n"
         "\n"
         "## Como abrir (2 pasos)\n"
@@ -2033,11 +2067,14 @@ def _readme_text(
         f"   `data/` de este proyecto. Ahora mismo es:\n\n       {data_dir.resolve()}\n"
         "3. **Aceptar** y luego **Actualizar**.\n"
         "\n"
-        "Las tablas de dimensiones y desgloses van embebidas dentro del\n"
-        "modelo (no dependen de la ruta); solo las tablas grandes se leen\n"
-        "de los CSV de `data/`.\n"
+        "Casi todas las tablas van embebidas dentro del modelo (no dependen\n"
+        "de la ruta); solo tablas gigantescas se leen de los CSV de `data/`.\n"
         "\n"
         "## Datos del modelo\n"
+    )
+
+    return (
+        (apertura_csv if usa_csv else apertura_portable) +
         "\n"
         f"{tablas}\n"
         "\n"

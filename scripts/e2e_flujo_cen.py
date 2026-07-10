@@ -98,7 +98,33 @@ def _parse_args() -> argparse.Namespace:
         default=3,
         help="Numero maximo de intentos para /refine.",
     )
+    parser.add_argument(
+        "--email",
+        default="",
+        help="Email para login (si el backend exige autenticacion).",
+    )
+    parser.add_argument(
+        "--password",
+        default="",
+        help="Password para login (si el backend exige autenticacion).",
+    )
     return parser.parse_args()
+
+
+def _login_si_aplica(client: "httpx.Client", base: str, email: str, password: str) -> None:
+    """Autentica contra el backend (deploy con seguridad) y fija el header
+    CSRF para las mutaciones. En local sin seguridad no hace falta."""
+    if not email or not password:
+        return
+    r = client.post(
+        f"{base}/auth/login", json={"email": email, "password": password}
+    )
+    if r.status_code != 200:
+        raise SystemExit(f"Login fallo {r.status_code}: {r.text[:200]}")
+    csrf = client.cookies.get("nutri_csrf")
+    if csrf:
+        client.headers["X-CSRF-Token"] = csrf
+    print(f"    login OK como {email}")
 
 
 def _resolve_path(raw_path: str) -> Path:
@@ -130,6 +156,7 @@ def main() -> int:
     print(f"[1] Health check...")
     r = client.get(f"{base}/health")
     r.raise_for_status()
+    _login_si_aplica(client, base, args.email, args.password)
     print(f"    base_url: {base}")
     print(f"    profile_id: {profile_id}")
     print(f"    left: {cen}")

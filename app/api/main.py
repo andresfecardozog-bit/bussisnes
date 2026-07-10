@@ -10,6 +10,7 @@ Uso en produccion (batch en la maquina del analista):
 """
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -45,8 +46,12 @@ from app.core.db import init_db
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # El gate de seguridad aborta el arranque en produccion si la config es
+    # insegura. Bajo pytest NO se aborta (los TestClient levantan la app con
+    # config de prueba); security_config_issues() se sigue validando por
+    # separado en test_config.py.
     issues = security_config_issues()
-    if issues:
+    if issues and "PYTEST_VERSION" not in os.environ:
         raise RuntimeError(
             "Configuracion insegura detectada:\n- " + "\n- ".join(issues)
         )

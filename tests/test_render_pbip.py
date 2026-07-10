@@ -123,7 +123,6 @@ def test_estructura_completa_del_proyecto(proyecto):
         "mini_pbip.SemanticModel/definition.pbism",
         "mini_pbip.SemanticModel/definition/database.tmdl",
         "mini_pbip.SemanticModel/definition/model.tmdl",
-        "mini_pbip.SemanticModel/definition/expressions.tmdl",
         "mini_pbip.SemanticModel/definition/tables/matched.tmdl",
         "mini_pbip.SemanticModel/definition/tables/no_cruzados.tmdl",
         "data/matched.csv",
@@ -175,10 +174,12 @@ def test_csvs_contienen_los_datos_con_key_renombrada(proyecto):
     assert list(no_cruz.columns) == ["origen", "key", "motivo"]
 
 
-def test_readme_documenta_el_parametro_de_ruta(proyecto):
+def test_readme_documenta_apertura_portable(proyecto):
     texto = (proyecto / "README.md").read_text(encoding="utf-8")
-    assert "RutaDatos" in texto
+    # Con todo embebido el PBIP es portable: el README no depende de RutaDatos.
     assert "Power BI Desktop" in texto
+    assert "embebidos dentro del modelo" in texto
+    assert "sin configurar rutas" in texto
 
 
 # ---------------------------------------------------------------------------
@@ -292,17 +293,36 @@ def test_una_medida_dax_por_kpi(proyecto):
     assert "COUNTROWS(matched)" in tmdl
 
 
-def test_particion_importa_csv_via_parametro(proyecto):
+def test_particion_inline_por_defecto_sin_rutadatos(proyecto):
+    """Por defecto (tablas bajo el umbral) todo va embebido: la particion no
+    usa CSV ni RutaDatos, y no se emite el archivo de parametros."""
     tmdl = (
         proyecto / "mini_pbip.SemanticModel/definition/tables/matched.tmdl"
     ).read_text(encoding="utf-8")
     assert "partition matched = m" in tmdl
     assert "mode: import" in tmdl
+    assert "Table.FromRows(Json.Document(Binary.Decompress(" in tmdl
+    assert "RutaDatos" not in tmdl
+    assert not (
+        proyecto / "mini_pbip.SemanticModel/definition/expressions.tmdl"
+    ).exists()
+
+
+def test_fallback_csv_para_tablas_enormes(tmp_path, monkeypatch):
+    """Si una tabla supera el umbral de inline, cae al fallback CSV + el
+    parametro RutaDatos (ruta que el usuario ajusta si mueve el proyecto)."""
+    import app.platform.render_pbip as rp
+
+    monkeypatch.setattr(rp, "INLINE_MAX_ROWS", 1)
+    out = tmp_path / "csv_fallback"
+    rp.render_pbip(_mini_profile(), _mini_result(), out)
+    tmdl = (
+        out / "mini_pbip.SemanticModel/definition/tables/matched.tmdl"
+    ).read_text(encoding="utf-8")
     assert 'RutaDatos & "\\matched.csv"' in tmdl
     assert "Csv.Document" in tmdl
-
     expressions = (
-        proyecto / "mini_pbip.SemanticModel/definition/expressions.tmdl"
+        out / "mini_pbip.SemanticModel/definition/expressions.tmdl"
     ).read_text(encoding="utf-8")
     assert "expression RutaDatos" in expressions
     assert "IsParameterQuery=true" in expressions
@@ -875,18 +895,23 @@ def test_relaciones_tmdl_fact_a_dimensiones(proyecto_cen):
     assert pd.api.types.is_numeric_dtype(fact["dim_cliente_id"])
 
 
-def test_dims_y_breakdowns_embebidos_fact_por_csv(proyecto_cen):
+def test_todas_las_tablas_embebidas_portable(proyecto_cen):
+    """Portabilidad: TODAS las tablas (dims, breakdowns, fact y crudas) van
+    embebidas (patron Enter Data) y ninguna depende de RutaDatos, para que el
+    zip abra en cualquier maquina sin configurar rutas."""
     out, _, _ = proyecto_cen
     tables_dir = out / "cen_vs_sap_v1_borrador.SemanticModel/definition/tables"
-    # dims y breakdowns chicos: particion inline (patron Enter Data)
-    for tabla in ("DimCliente", "DimMaterial", "DimDistrito", "Devoluciones"):
+    for tabla in (
+        "DimCliente", "DimMaterial", "DimDistrito", "Devoluciones",
+        "FactNivelServicio", "matched", "no_cruzados",
+    ):
         tmdl = (tables_dir / f"{tabla}.tmdl").read_text(encoding="utf-8")
         assert "Table.FromRows(Json.Document(Binary.Decompress(" in tmdl
         assert "RutaDatos" not in tmdl
-    # el fact y las particiones crudas siguen por CSV + parametro
-    for tabla in ("FactNivelServicio", "matched", "no_cruzados"):
-        tmdl = (tables_dir / f"{tabla}.tmdl").read_text(encoding="utf-8")
-        assert "RutaDatos" in tmdl
+    # sin tablas CSV no se emite el archivo de parametros
+    assert not (
+        out / "cen_vs_sap_v1_borrador.SemanticModel/definition/expressions.tmdl"
+    ).exists()
 
 
 def test_particion_inline_decodifica_los_datos_exactos(proyecto_extendido):
@@ -1049,11 +1074,11 @@ def test_readme_empieza_con_como_abrir(proyecto_cen):
     out, _, _ = proyecto_cen
     texto = (out / "README.md").read_text(encoding="utf-8")
     assert "## Como abrir (2 pasos)" in texto
-    assert texto.index("Como abrir") < texto.index("RutaDatos")
     assert "Doble clic" in texto
     assert "Actualizar" in texto
-    assert "Transformar datos > Editar parametros" in texto
+    # Portable: datos embebidos, sin paso de configuracion de ruta.
     assert "embebida en el modelo" in texto
+    assert "sin configurar rutas" in texto
 
 
 def test_pre_corte_v1_genera_proyecto_valido(tmp_path):
