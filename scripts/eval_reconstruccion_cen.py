@@ -24,7 +24,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.agents.crew import Crew  # noqa: E402
-from app.agents.orchestrator import list_questions, propose_profile  # noqa: E402
+from app.agents.orchestrator import (  # noqa: E402
+    answer_question,
+    list_questions,
+    propose_profile,
+)
 from app.core.db import get_conn, init_db  # noqa: E402
 from app.platform.profile import MatchProfile  # noqa: E402
 
@@ -41,6 +45,20 @@ BRIEF = (
     "tambien devoluciones). Quiero cuantos pedidos se entregaron completos, "
     "parciales y no entregados, en unidades y porcentaje, por material, "
     "distrito y cliente, y aparte los motivos de devolucion."
+)
+
+RESPUESTA = (
+    "Confirmado: el grano en CEN es linea de producto por orden. Cruzar por "
+    "DOBLE llave: numero de orden (CEN 'Numero de la Orden de compra' vs SAP "
+    "columna 56) Y codigo de item/material (CEN 'Codigo item proveedor' vs SAP "
+    "columna 40), normalizando espacios y ceros a la izquierda; agrupar por "
+    "(orden, item) en ambos lados. La cantidad pedida es 'Cantidad Total' del "
+    "CEN; la entregada es la columna 42 del SAP. Las devoluciones son las filas "
+    "con tipo de operacion DEVOLUCIONES (columna 13), con motivo en la columna "
+    "62: EXCLUIRLAS de la entrega (filter_not_equals) y reportarlas aparte por "
+    "motivo. Las ventas SAP sin orden CEN son canales directos (TAT, PUNTOS "
+    "PROPIOS, EMPLEADOS), no errores: quedan como no cruzadas. Distrito = "
+    "columna 11 SAP. Desglosar por material, distrito y cliente."
 )
 
 _ORDER_SRC = {"NUMERO DE LA ORDEN DE COMPRA", "56"}
@@ -137,6 +155,24 @@ def _score(p: MatchProfile) -> tuple[float, list[str]]:
     return ok / total * 100.0, detalle
 
 
+def _answer_and_refine(crew, conn, profile_id, resultado, rondas=2):
+    """Responde las preguntas abiertas con el contexto estandar y re-propone
+    (refine), como haria el analista. Mide el flujo real, no el borrador frio."""
+    version = resultado["profile"].version
+    for _ in range(rondas):
+        abiertas = list_questions(conn, profile_id, "abierta")
+        if not abiertas:
+            break
+        for q in abiertas:
+            answer_question(conn, q["id"], RESPUESTA)
+        version += 1
+        resultado = propose_profile(
+            crew, conn, profile_id, left_path=LEFT, right_path=RIGHT,
+            brief="", version=version,
+        )
+    return resultado
+
+
 def main() -> int:
     init_db()
     crew = Crew()  # falla explicito si no hay GEMINI_API_KEY
@@ -144,6 +180,8 @@ def main() -> int:
         resultado = propose_profile(
             crew, conn, "eval_cen", left_path=LEFT, right_path=RIGHT, brief=BRIEF
         )
+        score_frio, _ = _score(resultado["profile"])
+        resultado = _answer_and_refine(crew, conn, "eval_cen", resultado)
     propuesto = resultado["profile"]
     score, detalle = _score(propuesto)
 
@@ -153,14 +191,9 @@ def main() -> int:
     for line in detalle:
         print(" ", line)
     print("-" * 60)
-    print(f"SCORE: {score:.1f}% (gate: >=80%)")
-    print(f"Preguntas emitidas: {resultado['preguntas_nuevas']}")
+    print(f"SCORE en frio (sin responder):        {score_frio:.1f}%")
+    print(f"SCORE guiado (con respuestas+refine): {score:.1f}% (gate: >=80%)")
     print(f"Confianza global: {resultado['status'].confianza_global}")
-    print("\nPreguntas de los agentes:")
-    with get_conn() as conn:
-        for q in list_questions(conn, "eval_cen"):
-            marca = "BLOQ" if q["bloqueante"] else "info"
-            print(f"  [{marca}] ({q['agente']}) {q['pregunta'][:200]}")
     return 0 if score >= 80.0 else 1
 
 

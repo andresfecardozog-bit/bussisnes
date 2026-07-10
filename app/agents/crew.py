@@ -213,6 +213,20 @@ REGLAS DURAS del motor (si las violas, el cruce falla en runtime):
    una respuesta gigante se trunca y falla. INCLUYE columnas de contexto
    (canal, tipo de operacion, segmento) cuando ayuden a explicar las filas
    sin key o a desglosar el reporte.
+6. LLAVE COMPUESTA: si las dos fuentes comparten MAS DE UN identificador
+   (p.ej. un numero de orden/pedido Y un codigo de linea/item/material),
+   el join DEBE ir por TODAS las llaves compartidas (compuesto), no por una
+   sola. Cuando el grano es de linea (una orden con varios items), cruzar
+   solo por la orden produce cruces cartesianos y KPIs inflados: usa
+   orden+item juntas. Si dudas si el segundo codigo mapea directo o requiere
+   equivalencia, propone el join compuesto con tu mejor hipotesis Y declara
+   la duda en open_questions (no lo omitas).
+7. DEVOLUCIONES / REVERSIONES: si una fuente mezcla entregas/ventas con
+   devoluciones o reversiones (una columna de tipo de operacion o clase de
+   documento con valores como DEVOLUCION/RETURN/NC/reverso), EXCLUYE esas
+   filas del total entregado con filter_not_equals ANTES del cruce, y deja
+   la columna de motivo declarada para reportarlas aparte. Nunca sumes las
+   devoluciones como entrega: inflan el cumplimiento.
 {_PRINCIPIO_ENTREVISTA}
 {_METODO_ANALISIS}
 """

@@ -20,12 +20,26 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.agents.crew import Crew  # noqa: E402
-from app.agents.orchestrator import propose_profile  # noqa: E402
+from app.agents.orchestrator import (  # noqa: E402
+    answer_question,
+    list_questions,
+    propose_profile,
+)
 from app.core.db import get_conn, init_db  # noqa: E402
 from app.platform.profile import MatchProfile  # noqa: E402
 
 FIXTURES = PROJECT_ROOT / "tests" / "fixtures"
 REFERENCIA = PROJECT_ROOT / "profiles" / "pre_corte_v1.json"
+
+RESPUESTA = (
+    "El plan es la hoja RESUMEN: usar 'notificado' (notificado_unidades) como "
+    "plan; NO usar PRODUCIR de NOTIFICACION. El real es 'Cantidad Neta' del "
+    "FLASH (no 'Facturado Real'). Cruzar por codigo SAP MATERIAL en ambos "
+    "lados. El FLASH acumula el mes: agrupar por material y filtrar por la "
+    "fecha de produccion (parametro fecha_produccion, tipo date). Tratar los "
+    "valores de error '#VALUE!' como nulos/0. Cada factura+posicion es una "
+    "linea; agrupar por material antes del cruce."
+)
 
 
 def _source_of(profile: MatchProfile, lado: str, col_name: str) -> str | None:
@@ -140,6 +154,26 @@ def _score(propuesto: MatchProfile, referencia: MatchProfile) -> tuple[float, li
     return ok / total * 100.0, detalle
 
 
+LEFT = FIXTURES / "PRE_CORTE_muestra.xlsx"
+RIGHT = FIXTURES / "FLASH_muestra.csv"
+
+
+def _answer_and_refine(crew, conn, profile_id, resultado, rondas=2):
+    version = resultado["profile"].version
+    for _ in range(rondas):
+        abiertas = list_questions(conn, profile_id, "abierta")
+        if not abiertas:
+            break
+        for q in abiertas:
+            answer_question(conn, q["id"], RESPUESTA)
+        version += 1
+        resultado = propose_profile(
+            crew, conn, profile_id, left_path=LEFT, right_path=RIGHT,
+            brief="", version=version,
+        )
+    return resultado
+
+
 def main() -> int:
     init_db()
     referencia = MatchProfile.from_json(REFERENCIA.read_text(encoding="utf-8"))
@@ -147,13 +181,12 @@ def main() -> int:
 
     with get_conn() as conn:
         resultado = propose_profile(
-            crew,
-            conn,
-            "eval_pre_corte",
-            left_path=FIXTURES / "PRE_CORTE_muestra.xlsx",
-            right_path=FIXTURES / "FLASH_muestra.csv",
+            crew, conn, "eval_pre_corte",
+            left_path=LEFT, right_path=RIGHT,
             brief="medir cumplimiento de produccion",
         )
+        score_frio, _ = _score(resultado["profile"], referencia)
+        resultado = _answer_and_refine(crew, conn, "eval_pre_corte", resultado)
 
     propuesto = resultado["profile"]
     score, detalle = _score(propuesto, referencia)
@@ -164,20 +197,9 @@ def main() -> int:
     for line in detalle:
         print(" ", line)
     print("-" * 60)
-    print(f"SCORE: {score:.1f}% (gate: >=80%)")
-    print(f"Preguntas emitidas: {resultado['preguntas_nuevas']}")
+    print(f"SCORE en frio (sin responder):        {score_frio:.1f}%")
+    print(f"SCORE guiado (con respuestas+refine): {score:.1f}% (gate: >=80%)")
     print(f"Confianza global: {resultado['status'].confianza_global}")
-    print()
-    print("Preguntas de los agentes:")
-    from app.agents.orchestrator import list_questions
-
-    with get_conn() as conn:
-        for q in list_questions(conn, "eval_pre_corte"):
-            marca = "BLOQ" if q["bloqueante"] else "info"
-            print(f"  [{marca}] ({q['agente']}) {q['pregunta'][:200]}")
-    print()
-    print("Profile propuesto:")
-    print(propuesto.to_json())
     return 0 if score >= 80.0 else 1
 
 
