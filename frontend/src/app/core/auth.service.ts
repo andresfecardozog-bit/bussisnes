@@ -25,16 +25,21 @@ export class AuthService {
   private readonly apiBase = resolveApiBaseUrl(environment.apiBaseUrl);
   private readonly userState = signal<AuthUser | null>(null);
   private readonly loadedState = signal(false);
+  // Token CSRF en memoria: imprescindible en deploy cross-site (Vercel +
+  // Railway), donde el JS no puede leer la cookie CSRF de otro dominio.
+  private readonly csrfState = signal<string | null>(null);
 
   readonly user = computed(() => this.userState());
   readonly loaded = computed(() => this.loadedState());
   readonly isAuthenticated = computed(() => this.userState() !== null);
   readonly mustChangePassword = computed(() => this.userState()?.must_change_password ?? false);
+  readonly csrfToken = computed(() => this.csrfState());
 
   login(email: string, password: string): Observable<AuthLoginResponse> {
     return this.http.post<AuthLoginResponse>(`${this.apiBase}/auth/login`, { email, password }).pipe(
       tap(resp => {
         this.userState.set(resp.user);
+        if (resp.csrf_token) this.csrfState.set(resp.csrf_token);
         this.loadedState.set(true);
       }),
     );
@@ -56,6 +61,9 @@ export class AuthService {
 
   me(): Observable<AuthUser | null> {
     return this.http.get<AuthMeResponse>(`${this.apiBase}/auth/me`).pipe(
+      tap(resp => {
+        if (resp.csrf_token) this.csrfState.set(resp.csrf_token);
+      }),
       map(resp => resp.user),
       tap(user => {
         this.userState.set(user);
@@ -78,6 +86,7 @@ export class AuthService {
       .pipe(
         tap(resp => {
           this.userState.set(resp.user);
+          if (resp.csrf_token) this.csrfState.set(resp.csrf_token);
           this.loadedState.set(true);
         }),
       );
@@ -85,6 +94,7 @@ export class AuthService {
 
   clearLocalSession(): void {
     this.userState.set(null);
+    this.csrfState.set(null);
     this.loadedState.set(true);
   }
 }

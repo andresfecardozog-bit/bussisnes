@@ -21,12 +21,17 @@ function readCookie(name: string): string {
   return '';
 }
 
-function withSecurityHeaders(req: HttpRequest<unknown>): HttpRequest<unknown> {
+function withSecurityHeaders(
+  req: HttpRequest<unknown>,
+  csrfInMemory: string | null,
+): HttpRequest<unknown> {
   let next = req.clone({ withCredentials: true });
   const method = req.method.toUpperCase();
   const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
   if (isMutating) {
-    const csrf = readCookie('nutri_csrf');
+    // Preferir el token en memoria (funciona cross-site); la cookie solo es
+    // legible por JS en desarrollo same-site (localhost).
+    const csrf = csrfInMemory || readCookie('nutri_csrf');
     if (csrf) {
       next = next.clone({
         setHeaders: {
@@ -46,7 +51,7 @@ export const authInterceptor: HttpInterceptorFn = (
   const auth = inject(AuthService);
   const isAuthEndpoint = req.url.includes('/auth/login') || req.url.includes('/auth/me');
 
-  return next(withSecurityHeaders(req)).pipe(
+  return next(withSecurityHeaders(req, auth.csrfToken())).pipe(
     catchError((error: unknown) => {
       if (error instanceof HttpErrorResponse && error.status === 401) {
         auth.clearLocalSession();
