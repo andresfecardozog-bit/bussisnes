@@ -28,6 +28,9 @@ def _wait_job(client: TestClient, resp, timeout: float = 90.0):
 FIXTURES = Path(__file__).parent / "fixtures"
 CEN_JUNIO = FIXTURES / "cen" / "cen_junio_muestra.xlsx"
 SAP_MUESTRA = FIXTURES / "cen" / "sap_junio_muestra.xlsx"
+PRE_CORTE = FIXTURES / "PRE_CORTE_muestra.xlsx"
+FLASH = FIXTURES / "FLASH_muestra.csv"
+HOMOLOG = FIXTURES / "homologacion.xlsx"
 
 
 @pytest.fixture
@@ -103,3 +106,33 @@ def test_catalogo_ejecuta_consolidado_cen_vs_sap(client):
     dl = client.get(f"/catalogo/descargas/{body['run_token']}")
     assert dl.status_code == 200
     assert len(dl.json()["archivos"]) >= 2
+
+
+@pytest.mark.skipif(
+    not (PRE_CORTE.exists() and FLASH.exists() and HOMOLOG.exists()),
+    reason="faltan fixtures PRE CORTE/FLASH/homologacion",
+)
+def test_catalogo_pre_corte_reusa_exportador_legado(client):
+    # El catalogo SKU debe estar poblado para que PRE CORTE resuelva materiales.
+    from app.core.db import get_conn
+    from app.core.sku_catalog import import_from_homologacion
+
+    with get_conn() as conn:
+        import_from_homologacion(HOMOLOG, conn)
+
+    with PRE_CORTE.open("rb") as f1, FLASH.open("rb") as f2:
+        resp = client.post(
+            "/catalogo/pre_corte/ejecutar",
+            data={"modo": "consolidado"},
+            files=[
+                ("left_files", ("PRE CORTE 13.02.2026.xlsx", f1, "application/vnd.ms-excel")),
+                ("right_files", ("flash.csv", f2, "text/csv")),
+            ],
+        )
+    status, body = _wait_job(client, resp)
+    assert status == 200, body
+    assert len(body["resultados"]) == 1
+    assert any(a.endswith(".xlsx") for a in body["resultados"][0]["archivos"])
+    dl = client.get(f"/catalogo/descargas/{body['run_token']}")
+    assert dl.status_code == 200
+    assert any(a["path"].endswith(".xlsx") for a in dl.json()["archivos"])

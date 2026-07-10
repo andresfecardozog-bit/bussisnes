@@ -101,6 +101,129 @@ def _save_uploads(dest_dir: Path, uploads: list[UploadFile], rol: str) -> list[P
     return saved
 
 
+def _summary_legacy(result: Any) -> dict[str, int]:
+    s = result.summary()
+    return {
+        "matched": s.get("matched", 0),
+        "solo_left": s.get("solo_pre_corte", 0),
+        "solo_right": s.get("solo_flash", 0),
+        "no_cruzados": s.get("no_cruzados", 0),
+    }
+
+
+def _kpis_legacy(result: Any) -> dict[str, Any]:
+    import pandas as pd
+
+    m = result.matched
+    plan = float(pd.to_numeric(m.get("notificado_unidades"), errors="coerce").sum()) if len(m) else 0.0
+    real = float(pd.to_numeric(m.get("real_unidades_flash"), errors="coerce").sum()) if len(m) else 0.0
+    cumpl = round(real / plan * 100, 2) if plan > 0 else None
+    return {
+        "plan_total_unidades": plan,
+        "real_total_unidades": real,
+        "cumplimiento_global_pct": cumpl,
+        "fecha_produccion": result.fecha_produccion.isoformat(),
+    }
+
+
+def _ejecutar_pre_corte_legacy(
+    pre_cortes: list[Path], flashes: list[Path], modo: str, out_dir: Path
+) -> list[dict[str, Any]]:
+    """Reutiliza el pipeline y el exportador LEGADO (verificado) para PRE CORTE
+    vs FLASH: carga -> cruce por material via catalogo SAP -> persiste en el
+    historico -> exporta el Excel corporativo de 5-6 hojas (Portada, Resumen,
+    Por_Semana, Por_Categoria, Detalle_Material, No_Cruzados).
+
+    La fecha de produccion se deriva del nombre del PRE CORTE (como el legado).
+    """
+    from app.core.aggregator import aggregate_flash
+    from app.core.date_extractor import extract_file_date, extract_production_date
+    from app.core.db import get_conn as _legacy_conn
+    from app.core.db import persist_run
+    from app.core.exporters import export_cumplimiento_diario, export_cumplimiento_xlsx
+    from app.core.loaders import load_flash, load_pre_corte
+    from app.core.matcher import match_by_material
+
+    if len(flashes) != 1:
+        raise HTTPException(
+            status_code=422,
+            detail="PRE CORTE vs FLASH requiere exactamente 1 archivo FLASH (derecha).",
+        )
+    flash_path = flashes[0]
+    try:
+        flash_df, flash_meta = load_flash(flash_path)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"FLASH invalido: {exc}") from exc
+
+    fechas: list[Any] = []
+    resultados: list[dict[str, Any]] = []
+    for pc in pre_cortes:
+        try:
+            fecha = extract_production_date(pc.name)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"No pude leer la fecha del nombre '{pc.name}'. El PRE CORTE "
+                    "debe llamarse como 'PRE CORTE DD.MM.AAAA.xlsx'."
+                ),
+            ) from exc
+        try:
+            pre_df, pre_meta = load_pre_corte(pc)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=422, detail=f"PRE CORTE invalido: {exc}") from exc
+        flash_agg = aggregate_flash(flash_df, fecha)
+        result = match_by_material(pre_df, flash_agg, fecha)
+        with _legacy_conn() as conn:
+            persist_run(
+                conn,
+                pre_corte_meta=pre_meta,
+                pre_corte_df=pre_df,
+                flash_meta=flash_meta,
+                flash_agregado_df=flash_agg,
+                match_result=result,
+                fecha_archivo=extract_file_date(pc.name),
+            )
+        fechas.append(fecha)
+        if modo == "individual":
+            slug = fecha.strftime("%Y%m%d")
+            sub = out_dir / slug
+            sub.mkdir(parents=True, exist_ok=True)
+            dest = sub / f"cumplimiento_{slug}.xlsx"
+            export_cumplimiento_diario(fecha, dest)
+            resultados.append(
+                {
+                    "etiqueta": slug,
+                    "summary": _summary_legacy(result),
+                    "kpis": _kpis_legacy(result),
+                    "archivos": [dest.name],
+                }
+            )
+
+    if modo == "consolidado":
+        sub = out_dir / "consolidado"
+        sub.mkdir(parents=True, exist_ok=True)
+        desde, hasta = min(fechas), max(fechas)
+        nombre = (
+            f"cumplimiento_consolidado_{desde:%Y%m%d}_{hasta:%Y%m%d}.xlsx"
+            if desde != hasta
+            else f"cumplimiento_{desde:%Y%m%d}.xlsx"
+        )
+        dest = sub / nombre
+        export_cumplimiento_xlsx(desde, hasta, dest)
+        import pandas as pd
+
+        resultados.append(
+            {
+                "etiqueta": "consolidado",
+                "summary": {"matched": 0, "solo_left": 0, "solo_right": 0, "no_cruzados": 0},
+                "kpis": {"fechas": f"{desde.isoformat()} a {hasta.isoformat()}", "archivos_pre_corte": len(pre_cortes)},
+                "archivos": [dest.name],
+            }
+        )
+    return resultados
+
+
 def _render_and_zip(
     profile: MatchProfile, result: GenericMatchResult, out_dir: Path, slug: str
 ) -> dict[str, Any]:
@@ -197,7 +320,11 @@ async def ejecutar_catalogo(
     def _trabajo() -> dict[str, Any]:
         resultados: list[dict[str, Any]] = []
         try:
-            if modo == "consolidado":
+            if skill_id == "pre_corte":
+                # PRE CORTE reutiliza el pipeline + exportador legado (paridad
+                # exacta con el MVP verificado), no el motor generico.
+                resultados = _ejecutar_pre_corte_legacy(lefts, rights, modo, out_dir)
+            elif modo == "consolidado":
                 result = run_profile_multi(profile, lefts, rights)
                 resultados.append(
                     _render_and_zip(profile, result, out_dir / "consolidado", "consolidado")
