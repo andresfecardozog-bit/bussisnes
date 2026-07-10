@@ -709,3 +709,93 @@ def run_profile(
     )
     result.verify_accounting(len(left_df), len(right_df))
     return result
+
+
+def run_profile_multi(
+    profile: MatchProfile,
+    left_paths: list[str | Path],
+    right_paths: list[str | Path],
+    parameters: dict[str, Any] | None = None,
+) -> GenericMatchResult:
+    """Como `run_profile` pero uniendo VARIAS fuentes por lado.
+
+    Carga cada archivo con el loader del profile, concatena las fuentes ya
+    mapeadas por columnas y ejecuta el resto del pipeline con las MISMAS
+    funciones internas (prenormalizacion de llaves, transforms, join outer,
+    computed, KPIs, service level, breakdowns). Asi el consolidado es
+    numericamente identico a sumar los cruces individuales, con garantia de
+    cero perdida.
+
+    Caso de uso: procesos predefinidos que acumulan varios periodos (CEN P1..Pn
+    vs SAP mes1..mesn) en una sola base y un solo reporte.
+    """
+    parameters = parameters or {}
+    if not left_paths or not right_paths:
+        raise ValueError("run_profile_multi requiere al menos un archivo por lado")
+
+    faltantes = [
+        p.name for p in profile.parameters if p.required and p.name not in parameters
+    ]
+    if faltantes:
+        raise ValueError(f"Parametros runtime requeridos faltantes: {faltantes}")
+
+    left_keys = [(k.left, list(k.normalizers)) for k in profile.join.keys]
+    right_keys = [(k.right, list(k.normalizers)) for k in profile.join.keys]
+
+    left_raw = pd.concat(
+        [load_source(p, profile.left.loader)[0] for p in left_paths],
+        ignore_index=True,
+        sort=False,
+    )
+    right_raw = pd.concat(
+        [load_source(p, profile.right.loader)[0] for p in right_paths],
+        ignore_index=True,
+        sort=False,
+    )
+
+    left_df = _prenormalize_join_keys(left_raw, left_keys)
+    for transform in profile.left.transforms:
+        left_df = _apply_transform(left_df, transform, parameters)
+    left_df = left_df.reset_index(drop=True)
+
+    right_df = _prenormalize_join_keys(right_raw, right_keys)
+    for transform in profile.right.transforms:
+        right_df = _apply_transform(right_df, transform, parameters)
+    right_df = right_df.reset_index(drop=True)
+
+    merged, key_cols = _join(left_df, right_df, profile.join)
+    matched = merged[merged["_merge"] == "both"].drop(columns=["_merge"]).copy()
+    solo_left = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"]).copy()
+    solo_right = merged[merged["_merge"] == "right_only"].drop(columns=["_merge"]).copy()
+
+    matched = _apply_computed(matched, profile.computed)
+    kpis = _compute_kpis(matched, profile.kpis)
+    no_cruzados = _build_no_cruzados(solo_left, solo_right, key_cols, profile)
+
+    service_level_block: dict[str, Any] | None = None
+    if profile.service_level:
+        matched, service_level_block = _classify_service_level(
+            matched, solo_left, solo_right, profile.service_level
+        )
+        kpis["service_level"] = service_level_block
+
+    breakdowns: dict[str, pd.DataFrame] = {}
+    for bd in profile.breakdowns:
+        breakdowns[bd.id] = _run_breakdown(bd, matched, solo_left, right_raw)
+
+    result = GenericMatchResult(
+        profile_id=profile.profile_id,
+        profile_version=profile.version,
+        parameters=parameters,
+        matched=matched.reset_index(drop=True),
+        solo_left=solo_left.reset_index(drop=True),
+        solo_right=solo_right.reset_index(drop=True),
+        no_cruzados=no_cruzados,
+        kpis=kpis,
+        left_meta={"archivos": [Path(p).name for p in left_paths]},
+        right_meta={"archivos": [Path(p).name for p in right_paths]},
+        service_level=service_level_block,
+        breakdowns=breakdowns,
+    )
+    result.verify_accounting(len(left_df), len(right_df))
+    return result

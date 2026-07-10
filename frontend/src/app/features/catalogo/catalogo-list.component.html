@@ -1,0 +1,48 @@
+<div class="nutri-page nutri-stack">
+  <header class="nutri-page-header">
+    <div>
+      <p class="nutri-eyebrow">Habilidades de la cuenta</p>
+      <h1 class="nutri-page-header__title">Procesos predefinidos</h1>
+      <p class="nutri-page-header__subtitle">
+        Procesos ya validados que corren de forma determinista. Solo subes los
+        archivos (uno o varios) y obtienes los entregables sin volver a hablar
+        con los agentes: sale igual de bien, cada vez.
+      </p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="nutri-loading">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Cargando procesos...</span>
+    </div>
+  } @else if (error()) {
+    <div class="nutri-alert bad" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <div class="nutri-alert__body">
+        <p class="nutri-alert__title">No se pudo cargar el catalogo</p>
+        <p>{{ error() }}</p>
+      </div>
+    </div>
+  } @else {
+    <div class="catalogo-grid">
+      @for (it of items(); track it.skill_id) {
+        <div class="nutri-card catalogo-card">
+          <div class="catalogo-card__icon"><mat-icon>bolt</mat-icon></div>
+          <h2 class="nutri-section-title" style="margin:0;">{{ it.nombre }}</h2>
+          <p class="nutri-muted">{{ it.descripcion }}</p>
+          <div class="catalogo-card__io">
+            <span class="nutri-badge muted"><mat-icon>west</mat-icon> {{ it.left_label }}</span>
+            <span class="nutri-badge muted"><mat-icon>east</mat-icon> {{ it.right_label }}</span>
+          </div>
+          <div class="nutri-actions nutri-actions--end">
+            <a mat-flat-button color="primary" [routerLink]="['/app/catalogo', it.skill_id]">
+              <mat-icon>play_arrow</mat-icon>
+              Usar este proceso
+            </a>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

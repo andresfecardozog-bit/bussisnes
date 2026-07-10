@@ -25,6 +25,7 @@ from app.api.routes import (
     batches,
     calendario,
     catalog,
+    catalogo,
     exports,
     files,
     pipeline,
@@ -143,3 +144,4 @@ _include_private_router(exports.router, Depends(require_permission("download:all
 _include_private_router(calendario.router)
 _include_private_router(batches.router)
 _include_private_router(profiles.router)
+_include_private_router(catalogo.router)

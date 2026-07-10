@@ -50,6 +50,18 @@ export const routes: Routes = [
         title: "Business Intelligen't — Descargas",
       },
       {
+        path: 'catalogo',
+        loadComponent: () =>
+          import('./features/catalogo/catalogo-list.component').then(m => m.CatalogoListComponent),
+        title: "Business Intelligen't — Procesos predefinidos",
+      },
+      {
+        path: 'catalogo/:skillId',
+        loadComponent: () =>
+          import('./features/catalogo/catalogo-run.component').then(m => m.CatalogoRunComponent),
+        title: "Business Intelligen't — Ejecutar proceso",
+      },
+      {
         path: 'procesos',
         loadComponent: () =>
           import('./features/profiles/profiles-list.component').then(m => m.ProfilesListComponent),

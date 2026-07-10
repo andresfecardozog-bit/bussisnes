@@ -1,0 +1,159 @@
+<div class="nutri-page nutri-stack">
+  <header class="nutri-page-header">
+    <div>
+      <p class="nutri-eyebrow">Proceso predefinido</p>
+      <h1 class="nutri-page-header__title">{{ skill()?.nombre || skillId }}</h1>
+      <p class="nutri-page-header__subtitle">{{ skill()?.descripcion }}</p>
+    </div>
+    <div class="nutri-page-header__actions">
+      <a mat-stroked-button routerLink="/app/catalogo">
+        <mat-icon>arrow_back</mat-icon>
+        Volver al catalogo
+      </a>
+    </div>
+  </header>
+
+  @if (busy()) {
+    <section class="nutri-card nutri-card--featured">
+      <div class="nutri-loading">
+        <mat-spinner diameter="44"></mat-spinner>
+        <span>Procesando archivos y generando entregables...</span>
+      </div>
+    </section>
+  } @else {
+    <form (ngSubmit)="submit()" class="nutri-card nutri-stack">
+      @if (error()) {
+        <div class="nutri-alert bad" role="alert">
+          <mat-icon>error_outline</mat-icon>
+          <div class="nutri-alert__body">
+            <p class="nutri-alert__title">No se pudo ejecutar</p>
+            <p>{{ error() }}</p>
+          </div>
+        </div>
+      }
+
+      <div>
+        <h2 class="nutri-section-title">Como quieres el reporte</h2>
+        <div class="modo-chips">
+          <button type="button" class="modo-chip" [class.modo-chip--on]="modo() === 'consolidado'"
+                  (click)="setModo('consolidado')">
+            <mat-icon>merge</mat-icon>
+            <span><strong>Consolidado</strong><br><small>Une todos los archivos en una sola base y un solo reporte</small></span>
+          </button>
+          <button type="button" class="modo-chip" [class.modo-chip--on]="modo() === 'individual'"
+                  (click)="setModo('individual')">
+            <mat-icon>view_agenda</mat-icon>
+            <span><strong>Uno por archivo (mes por mes)</strong><br><small>Un reporte por cada pareja, emparejando por orden de subida</small></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="files-grid">
+        <div class="file-slot" [class.file-slot--filled]="leftFiles().length">
+          <p class="nutri-eyebrow">{{ skill()?.left_label || 'Fuente izquierda' }}</p>
+          <input type="file" hidden multiple #leftInput accept=".xlsx,.xls,.csv"
+                 (change)="onFiles('left', $event)" />
+          <div class="nutri-actions">
+            <button mat-stroked-button type="button" (click)="leftInput.click()">
+              <mat-icon>upload_file</mat-icon>
+              {{ leftFiles().length ? 'Cambiar archivos' : 'Seleccionar archivos' }}
+            </button>
+          </div>
+          @for (f of leftFiles(); track f.name) {
+            <span class="nutri-badge info">{{ f.name }}</span>
+          }
+        </div>
+
+        <div class="file-slot" [class.file-slot--filled]="rightFiles().length">
+          <p class="nutri-eyebrow">{{ skill()?.right_label || 'Fuente derecha' }}</p>
+          <input type="file" hidden multiple #rightInput accept=".xlsx,.xls,.csv"
+                 (change)="onFiles('right', $event)" />
+          <div class="nutri-actions">
+            <button mat-stroked-button type="button" (click)="rightInput.click()">
+              <mat-icon>upload_file</mat-icon>
+              {{ rightFiles().length ? 'Cambiar archivos' : 'Seleccionar archivos' }}
+            </button>
+          </div>
+          @for (f of rightFiles(); track f.name) {
+            <span class="nutri-badge info">{{ f.name }}</span>
+          }
+        </div>
+      </div>
+
+      @if (modo() === 'individual') {
+        <p class="nutri-muted">
+          <mat-icon style="vertical-align:middle;font-size:18px;">info</mat-icon>
+          En "uno por archivo" sube la misma cantidad por lado; se emparejan en
+          el orden en que los seleccionas.
+        </p>
+      }
+
+      <div class="nutri-actions nutri-actions--end">
+        <button mat-flat-button color="primary" type="submit" [disabled]="!canSubmit()">
+          <mat-icon>play_arrow</mat-icon>
+          Generar entregables
+        </button>
+      </div>
+    </form>
+  }
+
+  @if (result(); as rr) {
+    @for (res of rr.resultados; track res.etiqueta) {
+      <section class="nutri-card nutri-card--featured">
+        <div class="nutri-card-header">
+          <h2 class="nutri-section-title" style="margin:0;">Resultado: {{ res.etiqueta }}</h2>
+        </div>
+        <div class="nutri-kpi-grid">
+          <div class="nutri-kpi nutri-kpi--good">
+            <div class="nutri-kpi__body">
+              <span class="nutri-kpi__label">Cruzadas</span>
+              <span class="nutri-kpi__value">{{ res.summary.matched | number }}</span>
+            </div>
+          </div>
+          <div class="nutri-kpi nutri-kpi--warn">
+            <div class="nutri-kpi__body">
+              <span class="nutri-kpi__label">Solo izquierda</span>
+              <span class="nutri-kpi__value">{{ res.summary.solo_left | number }}</span>
+            </div>
+          </div>
+          <div class="nutri-kpi nutri-kpi--warn">
+            <div class="nutri-kpi__body">
+              <span class="nutri-kpi__label">Solo derecha</span>
+              <span class="nutri-kpi__value">{{ res.summary.solo_right | number }}</span>
+            </div>
+          </div>
+          @for (k of kpiList(res.kpis); track k.id) {
+            <div class="nutri-kpi nutri-kpi--brand">
+              <div class="nutri-kpi__body">
+                <span class="nutri-kpi__label">{{ k.id }}</span>
+                <span class="nutri-kpi__value">{{ k.value }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    @if (downloads().length > 0) {
+      <section class="nutri-card">
+        <div class="nutri-card-header">
+          <h2 class="nutri-section-title" style="margin:0;">Entregables</h2>
+        </div>
+        <div class="nutri-stack" style="gap:0.5rem;">
+          @for (f of downloads(); track f.path) {
+            <div class="downloads-file-row">
+              <div>
+                <strong>{{ f.path }}</strong>
+                <span class="nutri-muted"> — {{ f.kind }}, {{ f.size_bytes | number }} bytes</span>
+              </div>
+              <a mat-stroked-button color="primary" [href]="downloadHref(f.path)" download>
+                <mat-icon>download</mat-icon>
+                Descargar
+              </a>
+            </div>
+          }
+        </div>
+      </section>
+    }
+  }
+</div>

@@ -12,6 +12,7 @@ import pytest
 from app.platform.engine import (
     GranoNoResueltoError,
     run_profile,
+    run_profile_multi,
 )
 from app.platform.profile import MatchProfile
 
@@ -389,6 +390,32 @@ def test_division_por_cero_da_nan_no_explota(tmp_path):
 
     assert pd.isna(result.matched.iloc[0]["cumpl"])
     assert result.kpis["cumpl_global"] is None
+
+
+def test_run_profile_multi_un_par_equivale_a_run_profile():
+    """Con un solo archivo por lado, run_profile_multi da el MISMO resultado
+    que run_profile (misma union, mismo cruce, misma contabilidad)."""
+    profile = _cen_profile()
+    single = run_profile(profile, left_path=CEN_JUNIO, right_path=SAP_MUESTRA)
+    multi = run_profile_multi(profile, [CEN_JUNIO], [SAP_MUESTRA])
+    assert single.summary() == multi.summary()
+    assert single.kpis.get("cumplimiento_entregas_pct") == multi.kpis.get(
+        "cumplimiento_entregas_pct"
+    )
+
+
+def test_run_profile_multi_consolida_varios_archivos():
+    """Unir el mismo par dos veces duplica el volumen de entrada y mantiene la
+    garantia de cero perdida (verify_accounting no lanza)."""
+    profile = _cen_profile()
+    single = run_profile(profile, left_path=CEN_JUNIO, right_path=SAP_MUESTRA)
+    doble = run_profile_multi(
+        profile, [CEN_JUNIO, CEN_JUNIO], [SAP_MUESTRA, SAP_MUESTRA]
+    )
+    s1 = single.summary()
+    sd = doble.summary()
+    # al duplicar la entrada, el total contabilizado crece (no hay perdida)
+    assert sd["matched"] + sd["solo_left"] >= s1["matched"] + s1["solo_left"]
 
 
 def test_group_by_sum_tolera_valores_no_numericos():
