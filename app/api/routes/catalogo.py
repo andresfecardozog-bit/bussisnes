@@ -18,6 +18,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from app.api.jobs import create_job, run_job
 from app.api.security import AuthUser, current_user
 from app.config import DATA_DIR, MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES_PER_REQUEST
 from app.platform.engine import GenericMatchResult, run_profile, run_profile_multi
@@ -188,29 +189,41 @@ async def ejecutar_catalogo(
     run_token = f"{skill_id}_{user.user_id}_{uuid.uuid4().hex[:10]}"
     up_dir = _CATALOG_UPLOADS / run_token
     out_dir = _CATALOG_OUTPUTS / run_token
+    # Los archivos se guardan sincronicamente (los UploadFile no viven despues
+    # de que la peticion responde); el cruce+render pesado va al job.
     lefts = _save_uploads(up_dir, left_files, "left")
     rights = _save_uploads(up_dir, right_files, "right")
 
-    resultados: list[dict[str, Any]] = []
-    try:
-        if modo == "consolidado":
-            result = run_profile_multi(profile, lefts, rights)
-            resultados.append(
-                _render_and_zip(profile, result, out_dir / "consolidado", "consolidado")
-            )
-        else:
-            for i, (lp, rp) in enumerate(zip(lefts, rights), start=1):
-                result = run_profile(profile, left_path=lp, right_path=rp)
-                slug = f"parte_{i:02d}"
+    def _trabajo() -> dict[str, Any]:
+        resultados: list[dict[str, Any]] = []
+        try:
+            if modo == "consolidado":
+                result = run_profile_multi(profile, lefts, rights)
                 resultados.append(
-                    _render_and_zip(profile, result, out_dir / slug, slug)
+                    _render_and_zip(profile, result, out_dir / "consolidado", "consolidado")
                 )
-    except HTTPException:
-        raise
-    except (ValueError, AssertionError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+            else:
+                for i, (lp, rp) in enumerate(zip(lefts, rights), start=1):
+                    result = run_profile(profile, left_path=lp, right_path=rp)
+                    slug = f"parte_{i:02d}"
+                    resultados.append(
+                        _render_and_zip(profile, result, out_dir / slug, slug)
+                    )
+        except HTTPException:
+            raise
+        except (ValueError, AssertionError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "ok": True,
+            "skill_id": skill_id,
+            "modo": modo,
+            "run_token": run_token,
+            "resultados": resultados,
+        }
 
-    return {"ok": True, "skill_id": skill_id, "modo": modo, "run_token": run_token, "resultados": resultados}
+    job_id = create_job(f"catalogo:{skill_id}", user.user_id)
+    run_job(job_id, _trabajo)
+    return {"ok": True, "job_id": job_id, "run_token": run_token, "modo": modo}
 
 
 @router.get("/descargas/{run_token}")

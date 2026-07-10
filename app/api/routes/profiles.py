@@ -36,6 +36,7 @@ from app.agents.orchestrator import (
     proposal_status,
 )
 from app.agents.telemetry import telemetry_summary
+from app.api.jobs import create_job, run_job
 from app.api.security import (
     AuthUser,
     current_user,
@@ -437,37 +438,43 @@ async def create_draft(
             homologacion_import = _importar_homologacion_si_aplica(
                 conn, profile_id, homologacion
             )
-        try:
-            resultado = propose_profile(
-                crew, conn, profile_id, left, right, brief=brief
+    def _trabajo() -> dict[str, Any]:
+        with get_conn() as conn:
+            try:
+                resultado = propose_profile(
+                    crew, conn, profile_id, left, right, brief=brief
+                )
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"Propuesta fallo: {exc}") from exc
+            conn.execute(
+                """
+                UPDATE profiles
+                SET owner_user_id = COALESCE(owner_user_id, ?)
+                WHERE profile_id = ?
+                """,
+                (user.user_id, profile_id),
             )
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Propuesta fallo: {exc}") from exc
-        conn.execute(
-            """
-            UPDATE profiles
-            SET owner_user_id = COALESCE(owner_user_id, ?)
-            WHERE profile_id = ?
-            """,
-            (user.user_id, profile_id),
-        )
-        conn.commit()
-        return {
-            "profile_id": profile_id,
-            "status": resultado["status"].model_dump(),
-            "preguntas_nuevas": resultado["preguntas_nuevas"],
-            "profile": json.loads(resultado["profile"].to_json()),
-            "justificaciones": {
-                "mapping": resultado["mapping"].justificacion,
-                "kpis": resultado["kpis"].justificacion,
-                "report": resultado["report"].justificacion,
-            },
-            "resumen_fuentes": {
-                "left": resultado["scout_left"].resumen,
-                "right": resultado["scout_right"].resumen,
-            },
-            "homologacion_import": homologacion_import,
-        }
+            conn.commit()
+            return {
+                "profile_id": profile_id,
+                "status": resultado["status"].model_dump(),
+                "preguntas_nuevas": resultado["preguntas_nuevas"],
+                "profile": json.loads(resultado["profile"].to_json()),
+                "justificaciones": {
+                    "mapping": resultado["mapping"].justificacion,
+                    "kpis": resultado["kpis"].justificacion,
+                    "report": resultado["report"].justificacion,
+                },
+                "resumen_fuentes": {
+                    "left": resultado["scout_left"].resumen,
+                    "right": resultado["scout_right"].resumen,
+                },
+                "homologacion_import": homologacion_import,
+            }
+
+    job_id = create_job(f"draft:{profile_id}", user.user_id)
+    run_job(job_id, _trabajo)
+    return {"ok": True, "job_id": job_id, "profile_id": profile_id}
 
 
 @router.get("/{profile_id}/proposal")
@@ -581,36 +588,46 @@ def post_refine(
     profile_id: str,
     user: AuthUser = Depends(current_user),
 ) -> dict[str, Any]:
-    """Re-corre la propuesta con la memoria actualizada (nueva version)."""
+    """Re-corre la propuesta con la memoria actualizada (nueva version).
+
+    Asincrono: responde con `job_id`; la re-propuesta de los agentes corre en
+    segundo plano (evita el limite de tiempo del tunel)."""
     crew = _get_crew()
     with get_conn() as conn:
         _assert_profile_write_access(conn, profile_id, user)
-        left, right = _ultimos_archivos(conn, profile_id)
-        try:
-            actual = load_profile(conn, profile_id)
-            nueva_version = actual.version + 1
-        except KeyError:
-            nueva_version = 1
-        try:
-            resultado = propose_profile(
-                crew, conn, profile_id, left, right, brief="", version=nueva_version
-            )
-        except Exception as exc:
-            raise HTTPException(
-                status_code=502,
-                detail=(
-                    "Los agentes no lograron producir una propuesta valida en "
-                    f"este intento: {exc}. Reintentar el refine o ajustar las "
-                    "respuestas en el chat."
-                ),
-            ) from exc
-        return {
-            "profile_id": profile_id,
-            "version": nueva_version,
-            "status": resultado["status"].model_dump(),
-            "preguntas_nuevas": resultado["preguntas_nuevas"],
-            "profile": json.loads(resultado["profile"].to_json()),
-        }
+
+    def _trabajo() -> dict[str, Any]:
+        with get_conn() as conn:
+            left, right = _ultimos_archivos(conn, profile_id)
+            try:
+                actual = load_profile(conn, profile_id)
+                nueva_version = actual.version + 1
+            except KeyError:
+                nueva_version = 1
+            try:
+                resultado = propose_profile(
+                    crew, conn, profile_id, left, right, brief="", version=nueva_version
+                )
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        "Los agentes no lograron producir una propuesta valida en "
+                        f"este intento: {exc}. Reintentar el refine o ajustar las "
+                        "respuestas en el chat."
+                    ),
+                ) from exc
+            return {
+                "profile_id": profile_id,
+                "version": nueva_version,
+                "status": resultado["status"].model_dump(),
+                "preguntas_nuevas": resultado["preguntas_nuevas"],
+                "profile": json.loads(resultado["profile"].to_json()),
+            }
+
+    job_id = create_job(f"refine:{profile_id}", user.user_id)
+    run_job(job_id, _trabajo)
+    return {"ok": True, "job_id": job_id}
 
 
 @router.post("/{profile_id}/approve")
@@ -778,19 +795,46 @@ def post_generate(
 ) -> dict[str, Any]:
     """Ejecuta el profile aprobado Y genera los entregables descargables:
     Excel formateado (con la base de datos incluida como hojas-tabla) y
-    proyecto Power BI (PBIP) comprimido en zip."""
+    proyecto Power BI (PBIP) comprimido en zip.
+
+    Asincrono: responde al instante con `job_id`; el cruce + render pesado corre
+    en segundo plano y el frontend consulta GET /jobs/{id}."""
     with get_conn() as conn:
         _assert_profile_run_access(conn, profile_id, user)
-        profile, result = _ejecutar_aprobado(conn, profile_id, body.version, body.parameters)
-        info = persist_run(conn, result)
-        generados = _render_entregables(profile, result, profile_id)
-        return {
-            "ok": True,
-            "run": info,
-            "summary": result.summary(),
-            "kpis": result.kpis,
-            "archivos": generados,
-        }
+        # Verificacion rapida de aprobacion para feedback inmediato (409),
+        # antes de lanzar el trabajo pesado en segundo plano.
+        try:
+            _prof = load_profile(conn, profile_id, body.version)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        _row = conn.execute(
+            "SELECT status FROM profiles WHERE profile_id = ? AND version = ?",
+            (profile_id, _prof.version),
+        ).fetchone()
+        if _row is None or _row["status"] != "approved":
+            raise HTTPException(
+                status_code=409,
+                detail=f"El profile '{profile_id}' v{_prof.version} no esta aprobado.",
+            )
+    version = body.version
+    parameters = body.parameters
+
+    def _trabajo() -> dict[str, Any]:
+        with get_conn() as conn:
+            profile, result = _ejecutar_aprobado(conn, profile_id, version, parameters)
+            info = persist_run(conn, result)
+            generados = _render_entregables(profile, result, profile_id)
+            return {
+                "ok": True,
+                "run": info,
+                "summary": result.summary(),
+                "kpis": result.kpis,
+                "archivos": generados,
+            }
+
+    job_id = create_job(f"generate:{profile_id}", user.user_id)
+    run_job(job_id, _trabajo)
+    return {"ok": True, "job_id": job_id}
 
 
 @router.post("/{profile_id}/reejecutar")
@@ -844,17 +888,23 @@ async def post_reejecutar(
         if homologacion:
             _importar_homologacion_si_aplica(conn, profile_id, homologacion)
 
-        profile, result = _ejecutar_aprobado(conn, profile_id, version, {})
-        info = persist_run(conn, result)
-        generados = _render_entregables(profile, result, profile_id)
-        return {
-            "ok": True,
-            "run": info,
-            "summary": result.summary(),
-            "kpis": result.kpis,
-            "archivos": generados,
-            "reejecucion": True,
-        }
+    def _trabajo() -> dict[str, Any]:
+        with get_conn() as conn2:
+            profile2, result = _ejecutar_aprobado(conn2, profile_id, version, {})
+            info = persist_run(conn2, result)
+            generados = _render_entregables(profile2, result, profile_id)
+            return {
+                "ok": True,
+                "run": info,
+                "summary": result.summary(),
+                "kpis": result.kpis,
+                "archivos": generados,
+                "reejecucion": True,
+            }
+
+    job_id = create_job(f"reejecutar:{profile_id}", user.user_id)
+    run_job(job_id, _trabajo)
+    return {"ok": True, "job_id": job_id, "reejecucion": True}
 
 
 @router.get("/{profile_id}/downloads")

@@ -1,8 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, switchMap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { runtimeApiBaseUrl } from './api-base';
+import { pollJob } from './poll-job';
 
 export interface CatalogoItem {
   skill_id: string;
@@ -50,7 +51,9 @@ export class CatalogoService {
     for (const f of lefts) fd.append('left_files', f, f.name);
     for (const f of rights) fd.append('right_files', f, f.name);
     fd.append('modo', modo);
-    return this.http.post<EjecutarResponse>(`${this.base}/${skillId}/ejecutar`, fd);
+    return this.http
+      .post<{ job_id: string }>(`${this.base}/${skillId}/ejecutar`, fd)
+      .pipe(switchMap((r) => pollJob<EjecutarResponse>(this.http, this.apiBase, r.job_id)));
   }
 
   descargas(runToken: string): Observable<{ run_token: string; archivos: DescargaItem[] }> {

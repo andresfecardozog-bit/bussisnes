@@ -6,6 +6,7 @@ motor, persistencia) es real.
 """
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import openpyxl
@@ -13,6 +14,26 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.test_agents_fake import make_fake_model
+
+
+def _wait_job(client: TestClient, resp, timeout: float = 90.0):
+    """Si la respuesta trae job_id, hace polling hasta terminar y devuelve
+    (status_code, payload) equivalente al flujo sincrono anterior."""
+    if resp.status_code != 200:
+        return resp.status_code, resp.json()
+    body = resp.json()
+    if "job_id" not in body:
+        return resp.status_code, body
+    jid = body["job_id"]
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        j = client.get(f"/jobs/{jid}").json()
+        if j["status"] == "done":
+            return 200, j["result"]
+        if j["status"] == "error":
+            return int(j["error"]["status"]), {"detail": j["error"]["detail"]}
+        time.sleep(0.15)
+    raise AssertionError("job no termino a tiempo")
 
 
 @pytest.fixture
@@ -103,8 +124,9 @@ def draft(client, tmp_path):
                 "right_file": ("entregas.xlsx", f2, "application/vnd.ms-excel"),
             },
         )
-    assert resp.status_code == 200, resp.text
-    return resp.json()
+    status, body = _wait_job(client, resp)
+    assert status == 200, body
+    return body
 
 
 def test_draft_propone_y_registra_preguntas(draft):
@@ -179,8 +201,8 @@ def test_generate_produce_descargables(client, draft):
     client.post("/profiles/api_proc/approve", json={"aprobado_por": "ana"})
 
     resp = client.post("/profiles/api_proc/generate", json={})
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
+    status, body = _wait_job(client, resp)
+    assert status == 200, body
     assert any(a.endswith(".xlsx") for a in body["archivos"])
     assert any(a.endswith(".zip") for a in body["archivos"])
 
@@ -297,8 +319,8 @@ def test_reejecutar_plantilla_con_archivos_nuevos(client, draft, tmp_path):
                 "right_file": ("entregas2.xlsx", f2, "application/vnd.ms-excel"),
             },
         )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
+    status, body = _wait_job(client, resp)
+    assert status == 200, body
     assert body["reejecucion"] is True
     assert any(a.endswith(".xlsx") for a in body["archivos"])
     assert any(a.endswith(".zip") for a in body["archivos"])
@@ -335,7 +357,7 @@ def test_draft_acepta_homologacion_opcional(client, tmp_path):
                 "homologacion_file": ("homologacion.xlsx", fh, "application/vnd.ms-excel"),
             },
         )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
+    status, body = _wait_job(client, resp)
+    assert status == 200, body
     assert body["profile_id"] == "api_homolog"
     assert body["homologacion_import"]["ok"] is True

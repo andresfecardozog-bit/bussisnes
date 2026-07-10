@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__
+from app.api.jobs import router as jobs_router
 from app.api.rate_limit import is_request_allowed
 from app.api.routes import auth
 from app.api.routes import (
@@ -145,3 +146,4 @@ _include_private_router(calendario.router)
 _include_private_router(batches.router)
 _include_private_router(profiles.router)
 _include_private_router(catalogo.router)
+_include_private_router(jobs_router)

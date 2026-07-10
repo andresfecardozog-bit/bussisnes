@@ -1,7 +1,8 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, switchMap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { pollJob } from './poll-job';
 import {
   ApproveResponse,
   ChatMessage,
@@ -50,7 +51,9 @@ export class ProfilesService {
     if (homologacionFile) {
       fd.append('homologacion_file', homologacionFile, homologacionFile.name);
     }
-    return this.http.post<DraftResponse>(`${this.base}/draft`, fd);
+    return this.http
+      .post<{ job_id: string }>(`${this.base}/draft`, fd)
+      .pipe(switchMap((r) => pollJob<DraftResponse>(this.http, this.apiBase, r.job_id)));
   }
 
   uploadHomologacion(id: string, file: File): Observable<ChatPostResponse> {
@@ -83,7 +86,9 @@ export class ProfilesService {
   }
 
   refine(id: string): Observable<RefineResponse> {
-    return this.http.post<RefineResponse>(`${this.base}/${id}/refine`, {});
+    return this.http
+      .post<{ job_id: string }>(`${this.base}/${id}/refine`, {})
+      .pipe(switchMap((r) => pollJob<RefineResponse>(this.http, this.apiBase, r.job_id)));
   }
 
   approve(id: string, aprobadoPor = 'usuario', version?: number): Observable<ApproveResponse> {
@@ -109,10 +114,12 @@ export class ProfilesService {
   generate(
     id: string, version?: number, parameters?: Record<string, unknown>,
   ): Observable<GenerateResponse> {
-    return this.http.post<GenerateResponse>(`${this.base}/${id}/generate`, {
-      version: version ?? null,
-      parameters: parameters ?? {},
-    });
+    return this.http
+      .post<{ job_id: string }>(`${this.base}/${id}/generate`, {
+        version: version ?? null,
+        parameters: parameters ?? {},
+      })
+      .pipe(switchMap((r) => pollJob<GenerateResponse>(this.http, this.apiBase, r.job_id)));
   }
 
   reejecutar(
@@ -129,7 +136,9 @@ export class ProfilesService {
       fd.append('homologacion_file', homologacionFile, homologacionFile.name);
     }
     if (version != null) fd.append('version', String(version));
-    return this.http.post<GenerateResponse>(`${this.base}/${id}/reejecutar`, fd);
+    return this.http
+      .post<{ job_id: string }>(`${this.base}/${id}/reejecutar`, fd)
+      .pipe(switchMap((r) => pollJob<GenerateResponse>(this.http, this.apiBase, r.job_id)));
   }
 
   downloads(id: string): Observable<DownloadItem[]> {

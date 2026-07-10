@@ -1,10 +1,29 @@
 """Tests del catalogo de procesos predefinidos (habilidades reutilizables)."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+
+
+def _wait_job(client: TestClient, resp, timeout: float = 90.0):
+    if resp.status_code != 200:
+        return resp.status_code, resp.json()
+    body = resp.json()
+    if "job_id" not in body:
+        return resp.status_code, body
+    jid = body["job_id"]
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        j = client.get(f"/jobs/{jid}").json()
+        if j["status"] == "done":
+            return 200, j["result"]
+        if j["status"] == "error":
+            return int(j["error"]["status"]), {"detail": j["error"]["detail"]}
+        time.sleep(0.15)
+    raise AssertionError("job no termino a tiempo")
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CEN_JUNIO = FIXTURES / "cen" / "cen_junio_muestra.xlsx"
@@ -73,8 +92,8 @@ def test_catalogo_ejecuta_consolidado_cen_vs_sap(client):
                 ("right_files", ("sap.xlsx", f2, "application/vnd.ms-excel")),
             ],
         )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
+    status, body = _wait_job(client, resp)
+    assert status == 200, body
     assert body["modo"] == "consolidado"
     assert len(body["resultados"]) == 1
     res = body["resultados"][0]
