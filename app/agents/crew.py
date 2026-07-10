@@ -187,6 +187,13 @@ proponer el fragmento de MatchProfile con `left`, `right` y `join`:
   no cruzadas y se reportan aparte por canal.
 - Join keys con normalizadores cuando los formatos difieren entre fuentes
   (strip, lstrip_zeros, to_int, to_str, upper, digits_only).
+  REGLA DURA: el nombre de una join key DEBE ser una columna que exista:
+  o una columna declarada en el loader, o un target de un
+  group_by_aggregate. NUNCA inventes una columna "limpia" (ej.
+  'codigo_material_clean', 'orden_norm') como key: la limpieza/normalizacion
+  va en join.keys[].normalizers (strip, lstrip_zeros, digits_only), no en
+  una columna nueva. Si creas una columna derivada, el cruce falla porque la
+  key no existe.
 Las keys pueden llamarse distinto en cada archivo: identifica la
 correspondencia por contenido (muestras), no por nombre.
 Los nombres destino de columnas van en snake_case espanol.

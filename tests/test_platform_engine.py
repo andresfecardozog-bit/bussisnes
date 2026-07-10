@@ -418,6 +418,66 @@ def test_run_profile_multi_consolida_varios_archivos():
     assert sd["matched"] + sd["solo_left"] >= s1["matched"] + s1["solo_left"]
 
 
+def test_auto_fix_join_keys_remapea_columna_clean_inexistente():
+    """Si el agente nombra una join key 'X_clean' que no existe, el auto-fix la
+    remapea a la columna base real 'X' y arrastra el rename al group_by."""
+    from app.agents.orchestrator import _auto_fix_join_keys
+
+    profile = MatchProfile.model_validate(
+        {
+            "profile_id": "t_keys",
+            "version": 1,
+            "left": {
+                "role": "a",
+                "label": "A",
+                "loader": {
+                    "type": "tabular",
+                    "header_row": 1,
+                    "columns": [
+                        {"name": "codigo_material", "source": "MAT", "dtype": "str"},
+                        {"name": "cantidad", "source": "CANT", "dtype": "float_clean"},
+                    ],
+                },
+                "transforms": [
+                    {
+                        "op": "group_by_aggregate",
+                        "by": ["codigo_material_clean"],
+                        "aggregations": [
+                            {"target": "cantidad", "source": "cantidad", "fn": "sum"}
+                        ],
+                    }
+                ],
+            },
+            "right": {
+                "role": "b",
+                "label": "B",
+                "loader": {
+                    "type": "tabular",
+                    "header_row": 1,
+                    "columns": [
+                        {"name": "material", "source": "M", "dtype": "str"},
+                        {"name": "real", "source": "R", "dtype": "float_clean"},
+                    ],
+                },
+                "transforms": [],
+            },
+            "join": {
+                "keys": [
+                    {"left": "codigo_material_clean", "right": "material", "normalizers": ["strip"]}
+                ],
+                "type": "outer",
+            },
+            "kpis": [{"id": "c", "label": "Cuenta", "op": "count"}],
+        }
+    )
+    fixed, fixes = _auto_fix_join_keys(profile)
+    assert fixes, "debio corregir la llave inexistente"
+    assert fixed.join.keys[0].left == "codigo_material"
+    # el group_by tambien se remapeo al nombre real
+    gb = fixed.left.transforms[0]
+    assert gb.by == ["codigo_material"]
+
+
 def test_group_by_sum_tolera_valores_no_numericos():
     """Un group_by con sum sobre una columna que trae basura de texto
     ('CC55', vacios) no debe reventar con 'could not convert string to

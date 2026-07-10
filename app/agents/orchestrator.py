@@ -321,6 +321,99 @@ def _sanitize_report(report_spec, breakdowns) -> Any:
     return report_spec
 
 
+_KEY_SUFIJOS = ("_clean", "_norm", "_normalizado", "_normalized", "_std", "_limpio", "_key", "_norm_key")
+
+
+def _columnas_disponibles(source: SourceSpec) -> set[str]:
+    """Universo de nombres de columna REALES referenciables de una fuente:
+    columnas del loader + targets producidos por los transforms. Se acumula
+    (no se colapsa) para poder resolver una join key contra el nombre base
+    aunque un group_by mal planteado lo referencie con un sufijo '_clean'."""
+    cols: set[str] = set()
+    loader = source.loader
+    if getattr(loader, "type", "") == "tabular":
+        cols |= {c.name for c in loader.columns}
+    for t in source.transforms:
+        op = getattr(t, "op", "")
+        if op == "group_by_aggregate":
+            cols |= {a.target for a in t.aggregations}
+        elif op == "select_rename":
+            cols |= set(t.mapping.values())
+        elif op == "unpivot":
+            cols |= set(t.id_vars) | {t.var_name, t.value_name}
+    return cols
+
+
+def _resolver_nombre(name: str, disponibles: set[str]) -> str | None:
+    """Resuelve un nombre de columna tolerando mayusculas y sufijos de
+    'limpieza' inventados (_clean/_norm/...) contra las columnas reales."""
+    if name in disponibles:
+        return name
+    low = name.lower()
+    por_lower = {c.lower(): c for c in disponibles}
+    if low in por_lower:
+        return por_lower[low]
+    base = low
+    for suf in _KEY_SUFIJOS:
+        if base.endswith(suf):
+            base = base[: -len(suf)]
+            break
+    if base in por_lower:
+        return por_lower[base]
+    return None
+
+
+def _auto_fix_join_keys(profile: MatchProfile) -> tuple[MatchProfile, list[str]]:
+    """Corrige join keys que apuntan a columnas inexistentes porque el agente
+    invento un nombre 'limpio' (ej. 'codigo_material_cen_clean') en vez de
+    usar los normalizers de la llave. Se remapea al nombre base real y se
+    arrastra el rename a los group_by_aggregate que usaban el nombre viejo."""
+    fixes: list[str] = []
+    left_av = _columnas_disponibles(profile.left)
+    right_av = _columnas_disponibles(profile.right)
+
+    left_rename: dict[str, str] = {}
+    right_rename: dict[str, str] = {}
+    new_keys = []
+    for k in profile.join.keys:
+        upd: dict[str, str] = {}
+        rl = _resolver_nombre(k.left, left_av)
+        if rl and rl != k.left:
+            upd["left"] = rl
+            left_rename[k.left] = rl
+            fixes.append(f"join key izquierda '{k.left}' -> '{rl}'")
+        rr = _resolver_nombre(k.right, right_av)
+        if rr and rr != k.right:
+            upd["right"] = rr
+            right_rename[k.right] = rr
+            fixes.append(f"join key derecha '{k.right}' -> '{rr}'")
+        new_keys.append(k.model_copy(update=upd) if upd else k)
+
+    if not fixes:
+        return profile, fixes
+
+    def _fix_side_transforms(source: SourceSpec, rename: dict[str, str]) -> SourceSpec:
+        if not rename:
+            return source
+        nuevos = []
+        for t in source.transforms:
+            if getattr(t, "op", "") == "group_by_aggregate":
+                by = [rename.get(c, c) for c in t.by]
+                nuevos.append(t.model_copy(update={"by": by}))
+            else:
+                nuevos.append(t)
+        return source.model_copy(update={"transforms": nuevos})
+
+    nuevo = profile.model_copy(
+        update={
+            "left": _fix_side_transforms(profile.left, left_rename),
+            "right": _fix_side_transforms(profile.right, right_rename),
+            "join": profile.join.model_copy(update={"keys": new_keys}),
+        }
+    )
+    return nuevo, fixes
+
+
 def _auto_fix_grano(
     profile: MatchProfile,
     left_path: str | Path,
@@ -546,6 +639,13 @@ def propose_profile(
                 conn, profile_id, "nota", "sistema",
                 "Recortes automaticos por referencias rotas: " + "; ".join(recortes),
             )
+
+    profile, key_fixes = _auto_fix_join_keys(profile)
+    if key_fixes:
+        add_knowledge(
+            conn, profile_id, "nota", "sistema",
+            "Correccion automatica de llaves de cruce: " + "; ".join(key_fixes),
+        )
 
     profile, grano_fixes = _auto_fix_grano(profile, left_path, right_path)
     if grano_fixes:

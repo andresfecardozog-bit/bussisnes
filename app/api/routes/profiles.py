@@ -27,6 +27,7 @@ from pydantic import BaseModel
 
 from app.agents.orchestrator import (
     _auto_fix_grano,
+    _auto_fix_join_keys,
     answer_question,
     approve_proposed_profile,
     assume_question,
@@ -730,6 +731,7 @@ def _ejecutar_aprobado(conn, profile_id: str, version: int | None, parameters: d
             detail=f"El profile '{profile_id}' v{profile.version} no esta aprobado.",
         )
     left, right = _ultimos_archivos(conn, profile_id)
+    profile, _ = _auto_fix_join_keys(profile)
     profile, _ = _auto_fix_grano(profile, left, right, parameters)
     try:
         result = run_profile(
