@@ -19,31 +19,12 @@ import {
   UpdateProfileResponse,
 } from './profile-models';
 
-function resolveApiBaseUrl(raw: string): string {
-  const fallback = raw.replace(/\/+$/, '');
-  try {
-    const url = new URL(raw);
-    const currentHost =
-      typeof window !== 'undefined' ? window.location.hostname : '';
-    const localHosts = new Set(['localhost', '127.0.0.1']);
-    if (
-      currentHost &&
-      localHosts.has(url.hostname) &&
-      localHosts.has(currentHost) &&
-      url.hostname !== currentHost
-    ) {
-      url.hostname = currentHost;
-    }
-    return url.toString().replace(/\/+$/, '');
-  } catch {
-    return fallback;
-  }
-}
+import { runtimeApiBaseUrl } from './api-base';
 
 @Injectable({ providedIn: 'root' })
 export class ProfilesService {
   private readonly http = inject(HttpClient);
-  private readonly apiBase = resolveApiBaseUrl(environment.apiBaseUrl);
+  private readonly apiBase = runtimeApiBaseUrl(environment.apiBaseUrl);
   private readonly base = `${this.apiBase}/profiles`;
 
   apiBaseUrl(): string {

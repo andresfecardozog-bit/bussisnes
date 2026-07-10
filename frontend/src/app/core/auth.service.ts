@@ -3,26 +3,12 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, map, of, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthLoginResponse, AuthMeResponse, AuthUser } from './auth-models';
-
-function resolveApiBaseUrl(raw: string): string {
-  const fallback = raw.replace(/\/+$/, '');
-  try {
-    const url = new URL(raw);
-    const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
-    const localHosts = new Set(['localhost', '127.0.0.1']);
-    if (currentHost && localHosts.has(url.hostname) && localHosts.has(currentHost)) {
-      url.hostname = currentHost;
-    }
-    return url.toString().replace(/\/+$/, '');
-  } catch {
-    return fallback;
-  }
-}
+import { runtimeApiBaseUrl } from './api-base';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
-  private readonly apiBase = resolveApiBaseUrl(environment.apiBaseUrl);
+  private readonly apiBase = runtimeApiBaseUrl(environment.apiBaseUrl);
   private readonly userState = signal<AuthUser | null>(null);
   private readonly loadedState = signal(false);
   // Token CSRF en memoria: imprescindible en deploy cross-site (Vercel +
