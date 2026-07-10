@@ -502,9 +502,18 @@ def init_db(path: str | Path | None = None) -> Path:
 
 @contextmanager
 def get_conn(path: str | Path | None = None) -> Iterator[sqlite3.Connection]:
-    """Context manager que abre conexion, activa FKs y garantiza cierre."""
+    """Context manager que abre conexion, activa FKs y garantiza cierre.
+
+    `check_same_thread=False`: FastAPI resuelve las dependencias sincronas en un
+    pool de hilos (run_in_threadpool), asi que una misma conexion abierta por la
+    dependencia `db_connection` puede tocar hilos distintos dentro de UNA
+    request (db_connection en un hilo, require_auth en otro). Sin esto, sqlite3
+    lanza "objects created in a thread can only be used in that same thread" de
+    forma intermitente. El acceso sigue siendo secuencial (no concurrente) por
+    request, y cada `get_conn` abre su propia conexion, asi que es seguro.
+    """
     p = Path(path) if path else DB_PATH
-    conn = sqlite3.connect(p)
+    conn = sqlite3.connect(p, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     try:
