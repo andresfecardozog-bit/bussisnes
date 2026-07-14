@@ -6,11 +6,11 @@
 // Angular HttpClient trata la URL como path relativo y todas las llamadas
 // terminan resolviendose contra el propio dominio Vercel, con lo que
 // devuelven el index.html en vez de JSON y el frontend explota en runtime.
-// NOTA: Railway se pauso por creditos. Mientras tanto el backend corre local
-// expuesto por un tunel Cloudflare (URL temporal). Se puede sobreescribir en
-// runtime sin reconstruir con:  localStorage.setItem('apiBaseUrl', '<url>')
+// NOTA: backend desplegado en Railway (cuenta nueva: andresfecardozog-bit).
+// Si algun dia vuelve a cambiar el host, se puede sobreescribir en runtime con:
+//     localStorage.setItem('apiBaseUrl', '<url>'); location.reload();
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://athletic-exceed-commercial-exceed.trycloudflare.com',
+  apiBaseUrl: 'https://bussisnes-production.up.railway.app',
   n8nWebhookMatch: '',
 };
